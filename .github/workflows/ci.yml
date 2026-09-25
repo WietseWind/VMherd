@@ -49,7 +49,8 @@ jobs:
         run: cargo test --workspace --locked
       - name: Linux secrets without a Secret Service
         if: runner.os == 'Linux'
-        run: env -u DBUS_SESSION_BUS_ADDRESS cargo test -p vmherd --locked -- --ignored without_secret_service
+        # A bus that does not exist: unset, zbus would fall back to the runner's /run/user/<uid>/bus.
+        run: DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/bus cargo test -p vmherd --locked -- --ignored without_secret_service
       - name: Linux secrets with GNOME Keyring
         if: runner.os == 'Linux'
         run: |
