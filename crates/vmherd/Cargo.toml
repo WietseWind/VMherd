@@ -1,0 +1,48 @@
+[package]
+name = "vmherd"
+description = "VMherd: many Proxmox VM consoles in one grid, with one keyboard for all of them"
+version.workspace = true
+publish = false
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[[bin]]
+name = "vmherd"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+rfb.workspace = true
+pve.workspace = true
+eframe.workspace = true
+egui.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+directories.workspace = true
+keyring-core.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
+clap.workspace = true
+url.workspace = true
+image.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+apple-native-keyring-store.workspace = true
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-native-keyring-store.workspace = true
+
+[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
+zbus-secret-service-keyring-store.workspace = true
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"

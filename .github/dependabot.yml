@@ -1,0 +1,19 @@
+# Weekly update PRs for Rust crates and GitHub Actions (security updates come on top, as soon as an
+# advisory is published). Every PR runs CI + the supply-chain checks before it can be merged.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      rust-dependencies:
+        patterns: ["*"]
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

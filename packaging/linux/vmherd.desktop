@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=VMherd
+Comment=Many Proxmox VM consoles in one grid, one keyboard for all of them
+Exec=vmherd %U
+Icon=vmherd
+Terminal=false
+Categories=System;Network;RemoteAccess;
+Keywords=proxmox;vnc;console;kvm;

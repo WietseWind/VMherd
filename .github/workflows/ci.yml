@@ -1,0 +1,141 @@
+# Lint + test on macOS, Windows and Linux, then release builds (macOS .app, Windows .exe, Linux binary).
+# Third-party actions are pinned to commit SHAs (a moved tag cannot change what runs here).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rust (rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Linux packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends pkg-config libxkbcommon-dev libwayland-dev \
+            libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev dbus dbus-x11 gnome-keyring
+      - name: Format
+        if: runner.os == 'Linux'
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Tests
+        run: cargo test --workspace --locked
+      - name: Linux secrets without a Secret Service
+        if: runner.os == 'Linux'
+        run: env -u DBUS_SESSION_BUS_ADDRESS cargo test -p vmherd --locked -- --ignored without_secret_service
+      - name: Linux secrets with GNOME Keyring
+        if: runner.os == 'Linux'
+        run: |
+          dbus-run-session -- bash -c 'printf test | gnome-keyring-daemon --unlock --components=secrets >/dev/null 2>&1;
+            cargo test -p vmherd --locked -- --ignored credential_store_roundtrip'
+      - name: End-to-end typing through the mock Proxmox
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          python3 tools/mock_pve.py & sleep 2
+          cargo test -p vmherd --locked -- --ignored types_into_mock_consoles
+
+  build-macos:
+    name: Build macOS app
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rust (rust-toolchain.toml) + both macOS targets
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Universal VMherd.app (ad-hoc signed)
+        run: tools/bundle-macos.sh
+      - name: Zip
+        run: ditto -c -k --keepParent dist/VMherd.app dist/VMherd-macos-universal.zip
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: VMherd-macos-universal
+          path: dist/VMherd-macos-universal.zip
+          if-no-files-found: error
+
+  build-windows:
+    name: Build Windows exe
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rust (rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Release build
+        run: cargo build --release --locked -p vmherd
+      - name: Collect
+        shell: bash
+        run: |
+          mkdir -p dist/VMherd-windows-x64
+          cp target/release/vmherd.exe LICENSE.md LICENSE-COMMERCIAL.md THIRD-PARTY-LICENSES.md README.md dist/VMherd-windows-x64/
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: VMherd-windows-x64
+          path: dist/VMherd-windows-x64
+          if-no-files-found: error
+
+  build-linux:
+    name: Build Linux binary
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rust (rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Linux packages
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends pkg-config libxkbcommon-dev libwayland-dev \
+            libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+      - name: Release build
+        run: cargo build --release --locked -p vmherd
+      - name: Collect
+        run: |
+          d=dist/VMherd-linux-x64
+          mkdir -p $d
+          cp target/release/vmherd packaging/linux/vmherd.desktop assets/icon/vmherd-256.png \
+            LICENSE.md LICENSE-COMMERCIAL.md THIRD-PARTY-LICENSES.md README.md $d/
+          tar -C dist -czf dist/VMherd-linux-x64.tar.gz VMherd-linux-x64
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: VMherd-linux-x64
+          path: dist/VMherd-linux-x64.tar.gz
+          if-no-files-found: error

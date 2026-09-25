@@ -1,0 +1,38 @@
+[package]
+name = "pve"
+description = "Proxmox VE API client: token auth, pinned TLS, VM list, power, noVNC websocket"
+version.workspace = true
+publish = false
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+reqwest.workspace = true
+# `ext::ReasonPhrase` (Proxmox puts error texts in the HTTP reason phrase)
+hyper = { workspace = true, features = ["http1", "client"] }
+rustls.workspace = true
+rustls-platform-verifier.workspace = true
+tokio-rustls.workspace = true
+tokio-tungstenite.workspace = true
+tokio.workspace = true
+futures-util.workspace = true
+bytes.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+url.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+# Only for these features: they compile `log` trace records out of the whole binary, because
+# tungstenite trace-logs the raw console upgrade request (API token, vncticket) and every frame
+# payload (keystrokes). tracing's own macros are not affected.
+log = { workspace = true, features = ["max_level_debug", "release_max_level_debug"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+# self-signed certificates for the local TLS test servers
+rcgen = { version = "0.14", default-features = false, features = ["aws_lc_rs"] }

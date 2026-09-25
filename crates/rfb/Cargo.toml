@@ -1,0 +1,21 @@
+[package]
+name = "rfb"
+description = "Minimal async RFB (VNC) client for QEMU / Proxmox consoles"
+version.workspace = true
+publish = false
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+tokio.workspace = true
+des.workspace = true
+flate2.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
