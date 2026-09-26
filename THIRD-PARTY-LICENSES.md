@@ -1057,7 +1057,7 @@ Apache License
 ```
 ## Apache License 2.0
 
-Used by: dpi 0.1.2, winit 0.30.13
+Used by: winit 0.30.13, dpi 0.1.2
 
 ```
 Apache License
