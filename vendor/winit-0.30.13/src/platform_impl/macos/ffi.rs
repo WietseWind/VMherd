@@ -10,8 +10,6 @@ use core_foundation::string::CFStringRef;
 use core_foundation::uuid::CFUUIDRef;
 use core_graphics::base::CGError;
 use core_graphics::display::{CGDirectDisplayID, CGDisplayConfigRef};
-use objc2::ffi::NSInteger;
-use objc2::runtime::AnyObject;
 
 pub type CGDisplayFadeInterval = f32;
 pub type CGDisplayReservationInterval = f32;
@@ -117,13 +115,8 @@ extern "C" {
     pub fn CGDisplayModeRetain(mode: CGDisplayModeRef);
     pub fn CGDisplayModeRelease(mode: CGDisplayModeRef);
 
-    // Wildly used private APIs; Apple uses them for their Terminal.app.
-    pub fn CGSMainConnectionID() -> *mut AnyObject;
-    pub fn CGSSetWindowBackgroundBlurRadius(
-        connection_id: *mut AnyObject,
-        window_id: NSInteger,
-        radius: i64,
-    ) -> i32;
+    // VMherd patch: the private `CGSMainConnectionID` / `CGSSetWindowBackgroundBlurRadius`
+    // imports are removed; the Mac App Store rejects binaries that link private APIs.
 }
 
 mod core_video {

@@ -5,10 +5,10 @@ use std::ptr;
 
 use objc2::rc::{Retained, WeakId};
 use objc2::runtime::{AnyObject, Sel};
-use objc2::{declare_class, msg_send_id, mutability, sel, ClassType, DeclaredClass};
+use objc2::{declare_class, msg_send, msg_send_id, mutability, sel, ClassType, DeclaredClass};
 use objc2_app_kit::{
-    NSApplication, NSCursor, NSEvent, NSEventPhase, NSResponder, NSTextInputClient,
-    NSTrackingRectTag, NSView, NSViewFrameDidChangeNotification,
+    NSApplication, NSCursor, NSEvent, NSEventModifierFlags, NSEventPhase, NSEventType, NSResponder,
+    NSTextInputClient, NSTrackingRectTag, NSView, NSViewFrameDidChangeNotification,
 };
 use objc2_foundation::{
     MainThreadMarker, NSArray, NSAttributedString, NSAttributedStringKey, NSCopying,
@@ -767,12 +767,27 @@ declare_class!(
         }
 
         // Allows us to receive Ctrl-Tab and Ctrl-Esc.
-        // Note that this *doesn't* help with any missing Cmd inputs.
-        // https://github.com/chromium/chromium/blob/a86a8a6bcfa438fa3ac2eba6f02b3ad1f8e0756f/ui/views/cocoa/bridged_content_view.mm#L816
-        #[method(_wantsKeyDownForEvent:)]
-        fn wants_key_down_for_event(&self, _event: &NSEvent) -> bool {
-            trace_scope!("_wantsKeyDownForEvent:");
-            true
+        // AppKit offers key presses to the key window as key equivalents first, and keeps some
+        // Control combinations for itself (Ctrl-Tab moves the keyboard focus) instead of sending
+        // them to `keyDown:`. Claim every Control combination here and handle it like any other
+        // key press. Note that this *doesn't* help with any missing Cmd inputs.
+        //
+        // VMherd patch: this replaces the private `_wantsKeyDownForEvent:` override (which the
+        // Mac App Store rejects) with the public `performKeyEquivalent:`.
+        #[method(performKeyEquivalent:)]
+        fn perform_key_equivalent(&self, event: &NSEvent) -> bool {
+            trace_scope!("performKeyEquivalent:");
+            let mods = unsafe { event.modifierFlags() };
+            if unsafe { event.r#type() } == NSEventType::KeyDown
+                && mods.contains(NSEventModifierFlags::NSEventModifierFlagControl)
+                && !mods.contains(NSEventModifierFlags::NSEventModifierFlagCommand)
+                && self.is_key_view()
+            {
+                unsafe { self.keyDown(event) };
+                true
+            } else {
+                unsafe { msg_send![super(self), performKeyEquivalent: event] }
+            }
         }
 
         #[method(acceptsFirstMouse:)]
@@ -824,6 +839,12 @@ impl WinitView {
         *this.ivars().input_source.borrow_mut() = this.current_input_source();
 
         this
+    }
+
+    /// Whether key presses currently go to this view (VMherd patch, see `performKeyEquivalent:`).
+    fn is_key_view(&self) -> bool {
+        let window = self.window();
+        window.isKeyWindow() && window.firstResponder().is_some_and(|r| *r == ***self)
     }
 
     fn window(&self) -> Retained<WinitWindow> {

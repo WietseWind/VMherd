@@ -64,51 +64,59 @@ pub(crate) fn default_cursor() -> Retained<NSCursor> {
     NSCursor::arrowCursor()
 }
 
+// VMherd patch: winit loaded several cursors through undocumented `NSCursor` selectors
+// (`_helpCursor`, `_zoomInCursor`, `_windowResize*Cursor`, `busyButClickableCursor`). Those are
+// private API, which the Mac App Store rejects. They are replaced by the public cursors that
+// macOS 15 added, falling back to the system cursor images that `Move` and `Cell` already use.
+
+/// A public class method on `NSCursor` that newer macOS versions have (`None` on older ones).
 unsafe fn try_cursor_from_selector(sel: Sel) -> Option<Retained<NSCursor>> {
     let cls = NSCursor::class();
     if msg_send![cls, respondsToSelector: sel] {
         let cursor: Retained<NSCursor> = unsafe { msg_send_id![cls, performSelector: sel] };
         Some(cursor)
     } else {
-        tracing::warn!("cursor `{sel}` appears to be invalid");
         None
     }
 }
 
-macro_rules! def_undocumented_cursor {
-    {$(
-        $(#[$($m:meta)*])*
-        fn $name:ident();
-    )*} => {$(
-        $(#[$($m)*])*
-        #[allow(non_snake_case)]
-        fn $name() -> Retained<NSCursor> {
-            unsafe { try_cursor_from_selector(sel!($name)).unwrap_or_else(|| default_cursor()) }
+// `NSCursorFrameResizePosition` and `NSCursorFrameResizeDirectionsAll` (macOS 15).
+const FRAME_TOP_LEFT: usize = 1 | 2;
+const FRAME_TOP_RIGHT: usize = 1 | 8;
+const FRAME_BOTTOM_LEFT: usize = 4 | 2;
+const FRAME_BOTTOM_RIGHT: usize = 4 | 8;
+const FRAME_DIRECTIONS_ALL: usize = 1 | 2;
+
+/// Diagonal resize cursor: `+[NSCursor frameResizeCursorFromPosition:inDirections:]` on macOS
+/// 15 and later, else the system cursor image `name`.
+fn frame_resize_cursor(position: usize, name: &str) -> Retained<NSCursor> {
+    let cls = NSCursor::class();
+    let sel = sel!(frameResizeCursorFromPosition:inDirections:);
+    if unsafe { msg_send![cls, respondsToSelector: sel] } {
+        unsafe {
+            msg_send_id![
+                cls,
+                frameResizeCursorFromPosition: position,
+                inDirections: FRAME_DIRECTIONS_ALL,
+            ]
         }
-    )*};
+    } else {
+        system_cursor(name)
+    }
 }
 
-def_undocumented_cursor!(
-    // Undocumented cursors: https://stackoverflow.com/a/46635398/5435443
-    fn _helpCursor();
-    fn _zoomInCursor();
-    fn _zoomOutCursor();
-    fn _windowResizeNorthEastCursor();
-    fn _windowResizeNorthWestCursor();
-    fn _windowResizeSouthEastCursor();
-    fn _windowResizeSouthWestCursor();
-    fn _windowResizeNorthEastSouthWestCursor();
-    fn _windowResizeNorthWestSouthEastCursor();
+const SYSTEM_CURSORS: &str = "/System/Library/Frameworks/ApplicationServices.framework/Versions/\
+                              A/Frameworks/HIServices.framework/Versions/A/Resources/cursors";
 
-    // While these two are available, the former just loads a white arrow,
-    // and the latter loads an ugly deflated beachball!
-    // pub fn _moveCursor();
-    // pub fn _waitCursor();
-
-    // An even more undocumented cursor...
-    // https://bugs.eclipse.org/bugs/show_bug.cgi?id=522349
-    fn busyButClickableCursor();
-);
+/// A cursor image shipped with macOS (see `load_webkit_cursor`), or the arrow if this macOS
+/// version does not have it.
+fn system_cursor(name: &str) -> Retained<NSCursor> {
+    if std::path::Path::new(SYSTEM_CURSORS).join(name).join("info.plist").is_file() {
+        unsafe { load_webkit_cursor(&NSString::from_str(name)) }
+    } else {
+        default_cursor()
+    }
+}
 
 // Note that loading `busybutclickable` with this code won't animate
 // the frames; instead you'll just get them all in a column.
@@ -117,10 +125,7 @@ unsafe fn load_webkit_cursor(name: &NSString) -> Retained<NSCursor> {
     // cursors, and will seem completely standard to macOS users.
     //
     // https://stackoverflow.com/a/21786835/5435443
-    let root = ns_string!(
-        "/System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/\
-         HIServices.framework/Versions/A/Resources/cursors"
-    );
+    let root = NSString::from_str(SYSTEM_CURSORS);
     let cursor_path = root.stringByAppendingPathComponent(name);
 
     let pdf_path = cursor_path.stringByAppendingPathComponent(ns_string!("cursor.pdf"));
@@ -206,18 +211,20 @@ pub(crate) fn cursor_from_icon(icon: CursorIcon) -> Retained<NSCursor> {
         CursorIcon::SResize => NSCursor::resizeDownCursor(),
         CursorIcon::EwResize | CursorIcon::ColResize => NSCursor::resizeLeftRightCursor(),
         CursorIcon::NsResize | CursorIcon::RowResize => NSCursor::resizeUpDownCursor(),
-        CursorIcon::Help => _helpCursor(),
-        CursorIcon::ZoomIn => _zoomInCursor(),
-        CursorIcon::ZoomOut => _zoomOutCursor(),
-        CursorIcon::NeResize => _windowResizeNorthEastCursor(),
-        CursorIcon::NwResize => _windowResizeNorthWestCursor(),
-        CursorIcon::SeResize => _windowResizeSouthEastCursor(),
-        CursorIcon::SwResize => _windowResizeSouthWestCursor(),
-        CursorIcon::NeswResize => _windowResizeNorthEastSouthWestCursor(),
-        CursorIcon::NwseResize => _windowResizeNorthWestSouthEastCursor(),
-        // This is the wrong semantics for `Wait`, but it's the same as
-        // what's used in Safari and Chrome.
-        CursorIcon::Wait | CursorIcon::Progress => busyButClickableCursor(),
+        CursorIcon::Help => system_cursor("help"),
+        CursorIcon::ZoomIn => unsafe { try_cursor_from_selector(sel!(zoomInCursor)) }
+            .unwrap_or_else(|| system_cursor("zoomin")),
+        CursorIcon::ZoomOut => unsafe { try_cursor_from_selector(sel!(zoomOutCursor)) }
+            .unwrap_or_else(|| system_cursor("zoomout")),
+        CursorIcon::NeResize => frame_resize_cursor(FRAME_TOP_RIGHT, "resizenortheast"),
+        CursorIcon::NwResize => frame_resize_cursor(FRAME_TOP_LEFT, "resizenorthwest"),
+        CursorIcon::SeResize => frame_resize_cursor(FRAME_BOTTOM_RIGHT, "resizesoutheast"),
+        CursorIcon::SwResize => frame_resize_cursor(FRAME_BOTTOM_LEFT, "resizesouthwest"),
+        CursorIcon::NeswResize => frame_resize_cursor(FRAME_TOP_RIGHT, "resizenortheastsouthwest"),
+        CursorIcon::NwseResize => frame_resize_cursor(FRAME_TOP_LEFT, "resizenorthwestsoutheast"),
+        // There is no public busy cursor (the system shows the beach ball when the app hangs),
+        // and the `busybutclickable` image does not animate.
+        CursorIcon::Wait | CursorIcon::Progress => default_cursor(),
         CursorIcon::Move | CursorIcon::AllScroll => webkit_move(),
         CursorIcon::Cell => webkit_cell(),
         _ => default_cursor(),
