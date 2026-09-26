@@ -7,8 +7,9 @@
 set -euo pipefail
 export LC_ALL=C   # byte order for sort / comm, and fast
 cd "$(dirname "$0")/.."
+# The fallback only applies without an argument: a wrong explicit path must not check another binary.
 bin=${1:-dist/VMherd.app/Contents/MacOS/vmherd}
-[ -f "$bin" ] || bin=target/release/vmherd
+[ -n "${1:-}" ] || [ -f "$bin" ] || bin=target/release/vmherd
 [ -f "$bin" ] || { echo "no binary at $bin (build it first)" >&2; exit 2; }
 sdk=$(xcrun --show-sdk-path)
 tmp=$(mktemp -d)
