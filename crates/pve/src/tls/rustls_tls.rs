@@ -1,25 +1,32 @@
-//! rustls configuration with leaf-certificate pinning (see crate docs).
+//! rustls backend (all platforms but macOS).
 //!
 //! One [`Tls`] per [`crate::Client`]: a single `rustls::ClientConfig` (aws-lc-rs, safe default
-//! protocol versions, no client auth) with a [`PinningVerifier`], shared by the HTTP client and
-//! the console websocket.
+//! protocol versions, no client auth, no ALPN: HTTP/1.1 only) with a [`PinningVerifier`], shared
+//! by the REST connections and the console websocket. The verifier runs inside the handshake, so
+//! a refused certificate ends the connection before any application data is written.
 
 use std::error::Error as StdError;
+use std::net::IpAddr;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::{CryptoProvider, WebPkiSupportedAlgorithms};
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{CertificateError, ClientConfig, DigitallySignedStruct, OtherError, SignatureScheme};
-use sha2::{Digest, Sha256};
+use tokio::net::TcpStream;
+use url::Host;
 
+use super::{leaf_sha256, log_rejection};
+use crate::error::error_chain;
 use crate::{CertProblem, Error};
+
+/// A TLS connection whose server certificate was accepted.
+pub(crate) type TlsStream = tokio_rustls::client::TlsStream<TcpStream>;
 
 /// The TLS setup shared by all connections of one client.
 #[derive(Clone, Debug)]
 pub(crate) struct Tls {
-    /// Without ALPN (reqwest adds its own to its copy; the websocket needs plain HTTP/1.1).
-    pub(crate) config: Arc<ClientConfig>,
+    config: Arc<ClientConfig>,
     verifier: Arc<PinningVerifier>,
 }
 
@@ -35,6 +42,22 @@ impl Tls {
             .with_custom_certificate_verifier(verifier.clone())
             .with_no_client_auth();
         Ok(Self { config: Arc::new(config), verifier })
+    }
+
+    /// The TLS handshake over `tcp` to `host`; `label` (`host:port`) is for error messages.
+    /// A refused certificate is [`Error::UntrustedCert`] with the presented fingerprint.
+    pub(crate) async fn connect(&self, tcp: TcpStream, host: &Host<String>, label: &str) -> Result<TlsStream, Error> {
+        let server_name = match host {
+            Host::Domain(domain) => ServerName::try_from(domain.clone())
+                .map_err(|e| Error::Config(format!("invalid host name {domain:?}: {e}")))?,
+            Host::Ipv4(ip) => ServerName::IpAddress(IpAddr::V4(*ip).into()),
+            Host::Ipv6(ip) => ServerName::IpAddress(IpAddr::V6(*ip).into()),
+        };
+        let connector = tokio_rustls::TlsConnector::from(self.config.clone());
+        connector.connect(server_name, tcp).await.map_err(|e| match self.rejection_for(&e) {
+            Some(problem) => Error::UntrustedCert(problem),
+            None => Error::Network { host: label.to_owned(), detail: error_chain(&e) },
+        })
     }
 
     /// The certificate rejection behind a failed connection, if that is what happened.
@@ -81,12 +104,7 @@ impl PinningVerifier {
     }
 
     fn reject(&self, problem: CertProblem, reason: String) -> rustls::Error {
-        tracing::debug!(
-            fingerprint = %crate::format_fingerprint(&problem.sha256),
-            changed = problem.changed,
-            %reason,
-            "server certificate rejected"
-        );
+        log_rejection(&problem, &reason);
         *self.rejection.lock().unwrap_or_else(PoisonError::into_inner) = Some(problem.clone());
         rustls::Error::InvalidCertificate(CertificateError::Other(OtherError(Arc::new(Rejected { problem, reason }))))
     }
@@ -101,7 +119,7 @@ impl ServerCertVerifier for PinningVerifier {
         ocsp_response: &[u8],
         now: UnixTime,
     ) -> Result<ServerCertVerified, rustls::Error> {
-        let sha256 = leaf_sha256(end_entity);
+        let sha256 = leaf_sha256(end_entity.as_ref());
         match (self.pin, &self.platform) {
             (Some(pin), _) if pin == sha256 => Ok(ServerCertVerified::assertion()),
             (Some(_), _) => {
@@ -146,11 +164,6 @@ impl ServerCertVerifier for PinningVerifier {
 struct Rejected {
     problem: CertProblem,
     reason: String,
-}
-
-/// SHA-256 of a certificate's DER encoding.
-pub(crate) fn leaf_sha256(cert: &CertificateDer<'_>) -> [u8; 32] {
-    Sha256::digest(cert.as_ref()).into()
 }
 
 /// The first `Some` that `visit` returns for an error of the chain. Also descends into the
@@ -216,7 +229,7 @@ mod tests {
     #[test]
     fn pinned_leaf_is_accepted_without_other_checks() {
         let der = b"not even a real certificate";
-        let v = verifier(Some(leaf_sha256(&CertificateDer::from(der.to_vec()))));
+        let v = verifier(Some(leaf_sha256(der)));
         assert!(verify(&v, der).is_ok());
         assert_eq!(v.take_rejection(), None);
     }
@@ -225,8 +238,7 @@ mod tests {
     fn other_leaf_is_reported_as_changed() {
         let v = verifier(Some([7; 32]));
         let err = verify(&v, b"another certificate").unwrap_err();
-        let expected =
-            CertProblem { sha256: leaf_sha256(&CertificateDer::from(b"another certificate".to_vec())), changed: true };
+        let expected = CertProblem { sha256: leaf_sha256(b"another certificate"), changed: true };
         assert_eq!(find_rejection(&err), Some(expected.clone()));
         assert_eq!(v.take_rejection(), Some(expected));
         assert_eq!(v.take_rejection(), None, "taking clears the record");
@@ -245,7 +257,7 @@ mod tests {
 
         let problem = find_rejection(&Outer(io)).unwrap();
         assert!(problem.changed);
-        assert_eq!(problem.sha256, leaf_sha256(&CertificateDer::from(b"leaf".to_vec())));
+        assert_eq!(problem.sha256, leaf_sha256(b"leaf"));
     }
 
     #[test]
@@ -278,7 +290,7 @@ mod tests {
         let own = verify(&tls.verifier, b"this connection").unwrap_err();
         let io = std::io::Error::new(std::io::ErrorKind::InvalidData, own);
         let problem = tls.rejection_for(&io).unwrap();
-        assert_eq!(problem.sha256, leaf_sha256(&CertificateDer::from(b"this connection".to_vec())));
+        assert_eq!(problem.sha256, leaf_sha256(b"this connection"));
     }
 
     #[test]

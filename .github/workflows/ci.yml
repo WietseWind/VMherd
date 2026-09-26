@@ -43,6 +43,9 @@ jobs:
       - name: Format
         if: runner.os == 'Linux'
         run: cargo fmt --all -- --check
+      - name: macOS builds contain no third-party cryptography (App Store export compliance)
+        if: runner.os == 'Linux'
+        run: tools/check-macos-crypto.sh
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Clippy (store screenshot scenes)

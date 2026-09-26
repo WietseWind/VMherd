@@ -9,7 +9,7 @@ license = "PolyForm-Noncommercial-1.0.0"
 authors = ["The Integrators BV (NL), Wietse Wind"]
 repository = "https://github.com/WietseWind/VMherd"
 homepage = "https://github.com/WietseWind/VMherd"
-rust-version = "1.88"
+rust-version = "1.89"
 
 [workspace.dependencies]
 rfb = { path = "crates/rfb" }
@@ -20,15 +20,24 @@ egui = "0.36"
 tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "time"] }
 tokio-util = "0.7"
 tokio-tungstenite = "0.30"
+tokio-websockets = { version = "0.13", default-features = false, features = ["client", "getrandom", "sha1_smol"] }
 tokio-rustls = "0.26"
-reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "form", "query"] }
 rustls = "0.23"
 rustls-platform-verifier = "0.7"
+# macOS: TLS (Secure Transport), certificate trust and the VNC DES from the operating system
+security-framework = { version = "3.7", default-features = false, features = ["OSX_10_14"] }
+core-foundation = "0.10"
 keyring-core = "1"
 apple-native-keyring-store = { version = "1", features = ["keychain"] }
 windows-native-keyring-store = "1"
 zbus-secret-service-keyring-store = { version = "1", features = ["crypto-rust"] }
 hyper = "1"
+hyper-util = "0.1"
+http-body-util = "0.1"
+tower-service = "0.3"
+getrandom = "0.4"
+base64 = "0.22"
+sha1_smol = "1"
 des = "0.9"
 flate2 = "1.1"
 serde = { version = "1", features = ["derive"] }

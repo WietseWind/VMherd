@@ -61,26 +61,32 @@ cargo clippy --workspace --all-targets -- -D warnings
 - **macOS app**: `tools/bundle-macos.sh` → `dist/VMherd.app` (universal binary, ad-hoc signed; `--native` for this Mac only). To hand it to others, sign with a Developer ID and notarize.
 - **Linux**: needs the usual winit/wgpu deps (`libxkbcommon`, Wayland or X11, Vulkan or GL drivers). `packaging/linux/vmherd.desktop` + `assets/icon/vmherd-256.png` for menus. `tools/test-linux.sh` builds and tests it in Docker, with and without a Secret Service.
 - **Windows**: `cargo build --release -p vmherd`; the icon is embedded by `build.rs`.
+- **Cryptography**: on macOS VMherd uses only the operating system's: TLS through the system TLS stack and trust
+  store (Security.framework / Secure Transport, TLS 1.2), and the VNC password DES through Security.framework, so no
+  third-party encryption code ships in the app (App Store export compliance: "only uses encryption within Apple's
+  operating system"). Linux and Windows use rustls (aws-lc-rs) with the platform verifier and the `des` crate. The
+  certificate check (pin or system trust) finishes before any request or token is sent, on every platform.
+  `tools/check-macos-crypto.sh` fails if a third-party crypto crate enters the macOS dependency graph.
 - Licenses: `tools/licenses.sh` regenerates `THIRD-PARTY-LICENSES.md` (all crates for all platforms + the bundled fonts, via `cargo-about`); ship it with every build (the macOS bundle includes it). Run it after dependency updates.
 - Icons: edit `assets/icon/vmherd-prompt.svg` (+ `vmherd-prompt-small.svg` for 16–64 px), then `tools/make-icons.sh`. `VARIANT=proxmox` renders the private variant with a Proxmox-style X on the lead screen (`vmherd.svg`); the Proxmox logo is a trademark of Proxmox Server Solutions GmbH, so releases use the neutral `>_` set.
 
 ## CI and supply chain
 
 - **CI** (`.github/workflows/ci.yml`): format, clippy and tests on macOS, Windows and Linux (Linux also runs the
-  Secret Service tests and the end-to-end typing test against the mock), then release builds: universal
+  Secret Service tests, the end-to-end typing test against the mock and `tools/check-macos-crypto.sh`), then release builds: universal
   `VMherd.app` (zip), Windows `vmherd.exe`, Linux binary (tar.gz), each with the license files, as run artifacts.
 - **Supply chain** (`.github/workflows/supply-chain.yml`, also daily): `cargo-deny` with `deny.toml` checks RustSec
   advisories (vulnerable, unsound, yanked crates), that every crate comes from crates.io (no git or unknown
   registries), licenses and banned patterns; builds use the committed `Cargo.lock` (`--locked`). Dependabot
   (`.github/dependabot.yml`) proposes crate and GitHub Actions updates; third-party actions are pinned to commit SHAs.
-- Locally: `cargo deny check`, `tools/test-linux.sh`, `actionlint` / `zizmor .github/workflows`.
+- Locally: `cargo deny check`, `tools/check-macos-crypto.sh`, `tools/test-linux.sh`, `actionlint` / `zizmor .github/workflows`.
 
 ## Layout
 
 | Path | |
 |---|---|
 | `crates/rfb` | Minimal async RFB (VNC) client for QEMU: VNC auth, ZRLE / CopyRect / Raw, desktop resize, QEMU extended key events. `run(stream, …)` over any `AsyncRead + AsyncWrite`. |
-| `crates/pve` | Proxmox API client: token auth, pinned TLS (rustls), VM list, power, tasks, the `vncwebsocket` as a byte stream. |
+| `crates/pve` | Proxmox API client: token auth, pinned TLS (Security.framework on macOS, rustls elsewhere), VM list, power, tasks, the `vncwebsocket` as a byte stream. |
 | `crates/vmherd` | The egui app. |
 | `tools/mock_pve.py` | Mock Proxmox (API + VNC over websocket) that renders what it receives; for development without real VMs (`pip install pillow`). |
 
