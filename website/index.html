@@ -1,1 +1,509 @@
-Something coming soon...
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VMherd: every Proxmox VE console in one Mac window</title>
+<meta name="description" content="VMherd puts the live consoles of your Proxmox VE VMs and containers in one native Mac window. Type into all of them at once, or into just one. €19.99 on the Mac App Store.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#0a0c0b">
+<link rel="canonical" href="https://vmherd.app/">
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="assets/icon/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="icon" href="assets/icon/favicon-16.png" type="image/png" sizes="16x16">
+<link rel="apple-touch-icon" href="assets/icon/apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<link rel="preload" href="assets/fonts/BarlowSemiCondensed-Bold.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="assets/fonts/BarlowSemiCondensed-Medium.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="assets/css/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="VMherd">
+<meta property="og:url" content="https://vmherd.app/">
+<meta property="og:title" content="VMherd: every Proxmox VE console in one Mac window">
+<meta property="og:description" content="Type into all of your Proxmox VE consoles at once, or into just one. Native Mac app, written in Rust.">
+<meta property="og:image" content="https://vmherd.app/assets/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The VMherd icon, a sheep with a terminal prompt as its face, next to the words: VMherd, console grid for Proxmox VE.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="VMherd: every Proxmox VE console in one Mac window">
+<meta name="twitter:description" content="Type into all of your Proxmox VE consoles at once, or into just one. Native Mac app, written in Rust.">
+<meta name="twitter:image" content="https://vmherd.app/assets/img/og.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "VMherd",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "macOS",
+  "url": "https://vmherd.app/",
+  "downloadUrl": "https://apps.apple.com/app/vmherd/id6816533992",
+  "image": "https://vmherd.app/assets/icon/icon-512.png",
+  "description": "Every Proxmox VE console, live in one native Mac window. Type once into all of them, or click one to go solo.",
+  "offers": { "@type": "Offer", "price": "19.99", "priceCurrency": "EUR" },
+  "publisher": { "@type": "Organization", "name": "The Integrators BV", "email": "support@vmherd.app" }
+}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="./" aria-label="VMherd home">
+      <img src="assets/icon/logo-80.png" width="36" height="36" alt="">
+      <span class="wordmark">VM<b>HERD</b></span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a class="hide-sm" href="#features">Features</a>
+      <a class="hide-sm" href="#keyboard">Keys</a>
+      <a class="hide-sm" href="#security">Security</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/WietseWind/VMherd">GitHub</a>
+      <a class="btn btn-go" href="https://apps.apple.com/app/vmherd/id6816533992">Get it</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero" aria-labelledby="hero-title">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">For Proxmox VE <span class="n mid">//</span> native on your Mac</p>
+      <h1 id="hero-title">One keyboard. <span>The whole herd.</span></h1>
+      <p class="lede">All your Proxmox VE consoles in one native Mac window. Type into all of them at once, or into just one.</p>
+      <p class="sub">Made for the part before SSH works: OS installers, first logins, network setup, boot menus and recovery shells. On twelve machines at a time, without twelve browser tabs.</p>
+      <div class="cta">
+        <div class="cta-buy">
+          <a class="appstore" href="https://apps.apple.com/app/vmherd/id6816533992">
+            <img src="assets/badges/mac-app-store.svg" width="156" height="40" alt="Download on the Mac App Store">
+            <span class="fallback" aria-hidden="true">Download on the Mac App Store</span>
+          </a>
+          <p class="price"><strong>€19.99</strong><span>one-time purchase</span></p>
+        </div>
+        <a class="src-link" href="https://github.com/WietseWind/VMherd">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg>
+          Source on GitHub <span class="arr" aria-hidden="true">&rarr;</span>
+        </a>
+      </div>
+      <ul class="chips" aria-label="At a glance">
+        <li>Apple silicon + Intel</li>
+        <li>written in Rust</li>
+        <li>no account</li>
+        <li>no analytics</li>
+      </ul>
+    </div>
+
+    <!-- Illustration: one keystroke stream fanning out to many consoles (animated by site.js). -->
+    <div class="herd" role="img" aria-label="Illustration: a broadcast bar marked ON AIR sends the same command to a grid of nine VM consoles at once; one console has its sync toggle off and is skipped.">
+      <div class="herd-top" aria-hidden="true">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span>VM<b>HERD</b></span>
+        <span class="mode">ON AIR</span>
+      </div>
+      <div class="herd-bar" aria-hidden="true"><span class="prompt">&#9679; ON AIR &rarr; 8 consoles &rsaquo; </span><span class="typed">apt update &amp;&amp; apt -y full-upgrade</span><span class="caret"></span></div>
+      <svg class="herd-wires" aria-hidden="true"></svg>
+      <div class="herd-grid" aria-hidden="true">
+        <div class="tile hot" data-name="web-01" data-ip="192.0.2.11"><div class="tile-head"><span class="lamp"></span><span class="id">101</span><span class="nm">web-01</span><span class="solo-tag">SOLO</span><span class="sync"></span></div><pre class="tile-screen"><span class="m">web-01 login: root</span>
+<span class="g">root@web-01:~# apt update &amp;&amp; apt -y full-upgrade</span></pre></div>
+        <div class="tile hot" data-name="web-02" data-ip="192.0.2.12"><div class="tile-head"><span class="lamp"></span><span class="id">102</span><span class="nm">web-02</span><span class="solo-tag">SOLO</span><span class="sync"></span></div><pre class="tile-screen"><span class="m">web-02 login: root</span>
+<span class="g">root@web-02:~# apt update &amp;&amp; apt -y full-upgrade</span></pre></div>
+        <div class="tile hot" data-name="db-01" data-ip="198.51.100.21"><div class="tile-head"><span class="lamp"></span><span class="id">104</span><span class="nm">db-01</span><span class="solo-tag">SOLO</span><span class="sync"></span></div><pre class="tile-screen"><span class="m">db-01 login: root</span>
+<span class="g">root@db-01:~# apt update &amp;&amp; apt -y full-upgrade</span></pre></div>
+        <div class="tile hot" data-name="db-02" data-ip="198.51.100.22"><div class="tile-head"><span class="lamp"></span><span class="id">105</span><span class="nm">db-02</span><span class="solo-tag">SOLO</span><span class="sync"></span></div><pre class="tile-screen"><span class="m">db-02 login: root</span>
+<span class="g">root@db-02:~# apt update &amp;&amp; apt -y full-upgrade</span></pre></div>
+        <div class="tile nosync" data-name="ci-01" data-ip="203.0.113.51"><div class="tile-head"><span class="lamp"></span><span class="id">110</span><span class="nm">ci-01</span><span class="solo-tag">SOLO</span><span class="sync"></span></div><pre class="tile-screen"><span class="m">ci-01 login: root</span>
+<span class="g">root@ci-01:~# </span></pre></div>
+        <div class="tile hot" data-name="k8s-1" data-ip="203.0.113.41"><div class="tile-head"><span class="lamp"></span><span class="id">107</span><span class="nm">k8s-1</span><span class="solo-tag">SOLO</span><span class="sync"></span></div><pre class="tile-screen"><span class="m">k8s-1 login: root</span>
+<span class="g">root@k8s-1:~# apt update &amp;&amp; apt -y full-upgrade</span></pre></div>
+        <div class="tile hot" data-name="k8s-2" data-ip="203.0.113.42"><div class="tile-head"><span class="lamp"></span><span class="id">108</span><span class="nm">k8s-2</span><span class="solo-tag">SOLO</span><span class="sync"></span></div><pre class="tile-screen"><span class="m">k8s-2 login: root</span>
+<span class="g">root@k8s-2:~# apt update &amp;&amp; apt -y full-upgrade</span></pre></div>
+        <div class="tile hot" data-name="dns-01" data-ip="192.0.2.53"><div class="tile-head"><span class="lamp"></span><span class="id">111</span><span class="nm">dns-01</span><span class="solo-tag">SOLO</span><span class="sync"></span></div><pre class="tile-screen"><span class="m">dns-01 login: root</span>
+<span class="g">root@dns-01:~# apt update &amp;&amp; apt -y full-upgrade</span></pre></div>
+        <div class="tile hot" data-name="vpn-01" data-ip="198.51.100.9"><div class="tile-head"><span class="lamp"></span><span class="id">112</span><span class="nm">vpn-01</span><span class="solo-tag">SOLO</span><span class="sync"></span></div><pre class="tile-screen"><span class="m">vpn-01 login: root</span>
+<span class="g">root@vpn-01:~# apt update &amp;&amp; apt -y full-upgrade</span></pre></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="strip">
+  <div class="wrap">
+    <p>Before SSH works</p>
+    <ul>
+      <li>OS installers</li>
+      <li>first logins</li>
+      <li>network setup</li>
+      <li>boot menus</li>
+      <li>recovery shells</li>
+    </ul>
+  </div>
+</div>
+
+<!-- 01: many at once -->
+<section class="section" id="features" aria-labelledby="f1">
+  <div class="wrap feature">
+    <div class="feature-text">
+      <p class="eyebrow"><span class="n">01</span> Many at once</p>
+      <h2 id="f1">Every console, live, in one grid.</h2>
+      <p class="lede">Pick VMs and containers from your cluster and watch all of their consoles side by side. No browser tabs, no noVNC windows to juggle.</p>
+      <ul class="ticks">
+        <li>Every tile shows <strong>VMID, name and a status lamp</strong> above its live console, plus node and uptime when there is room.</li>
+        <li>Consoles <strong>connect by themselves</strong> while a VM runs, so you see it boot, and reconnect after a drop.</li>
+        <li>Tiles appear in the order you pick them. <strong>Automatic layout or 1 to 8 columns</strong>, remembered per cluster.</li>
+        <li>Consoles open in <strong>shared mode</strong>: a Proxmox web console that is already open stays connected.</li>
+      </ul>
+    </div>
+    <figure>
+      <a class="shot" href="assets/shots/grid.png">
+        <picture>
+          <source srcset="assets/shots/grid.webp" type="image/webp">
+          <img src="assets/shots/grid.png" width="1600" height="1000" loading="lazy" decoding="async" alt="VMherd showing twelve VM consoles in a four by three grid; each tile has a VMID, a name, a green status lamp and a live console, one VM is powered off.">
+        </picture>
+        <span class="zoom" aria-hidden="true">ZOOM +</span>
+      </a>
+      <figcaption><b>Grid.</b> Twelve consoles, one window.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- 02: control all at once -->
+<section class="section" aria-labelledby="f2">
+  <div class="wrap feature flip">
+    <div class="feature-text">
+      <p class="eyebrow"><span class="n">02</span> Control all at once</p>
+      <h2 id="f2">Type once. Every synced console follows.</h2>
+      <p class="lede">Click the broadcast bar, or press <kbd>Enter</kbd>, and it goes <strong>ON AIR</strong>: every keystroke goes to all synced consoles at the same time, as real key presses.</p>
+      <p>Think csshX or tmux <code>synchronize-panes</code>, but on the VM console itself, so it works before there is a network, an SSH daemon or even an installed OS.</p>
+      <ul class="ticks">
+        <li>A red <strong>sync toggle</strong> on every tile decides which consoles follow along. Sync all or none in one click.</li>
+        <li><kbd>⌘</kbd> <kbd>V</kbd> types the clipboard into the consoles, and asks first when it holds several lines.</li>
+        <li>Keys follow the guest's own keyboard layout, like a real keyboard. Held keys are released when the window loses focus, so no modifier stays stuck.</li>
+        <li><strong>Hold <kbd>Esc</kbd> for one second</strong> to stop. A short <kbd>Esc</kbd> still goes to the consoles.</li>
+      </ul>
+      <ul class="keys-strip" aria-label="Buttons in the broadcast bar">
+        <li><kbd>↵</kbd></li><li><kbd>Tab</kbd></li><li><kbd>Esc</kbd></li><li><kbd>↑</kbd></li><li><kbd>↓</kbd></li><li><kbd>^C</kbd></li><li><kbd>^D</kbd></li><li><kbd>^Z</kbd></li><li><kbd>^L</kbd></li>
+      </ul>
+    </div>
+    <figure>
+      <a class="shot" href="assets/shots/broadcast.png">
+        <picture>
+          <source srcset="assets/shots/broadcast.webp" type="image/webp">
+          <img src="assets/shots/broadcast.png" width="1600" height="1000" loading="lazy" decoding="async" alt="Broadcast mode: the bottom bar is red and reads ON AIR, and the same apt command appears in eleven consoles; one tile with its sync toggle off did not receive it.">
+        </picture>
+        <span class="zoom" aria-hidden="true">ZOOM +</span>
+      </a>
+      <figcaption><b>ON AIR.</b> Eleven consoles type along; the one with sync off does not.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- 03: placeholders -->
+<section class="section" aria-labelledby="f3">
+  <div class="wrap feature">
+    <div class="feature-text">
+      <p class="eyebrow"><span class="n">03</span> Per-VM values</p>
+      <h2 id="f3">One line, a different value on every machine.</h2>
+      <p class="lede"><strong>Type text</strong> sends a command or a script to every synced console, and fills in placeholders for each VM on the way.</p>
+      <div class="term">
+        <div class="term-head">Type text</div>
+<pre><code class="s">hostnamectl set-hostname <span class="ph">{{name}}</span>
+echo "<span class="ph">{{vmid}}</span> on <span class="ph">{{node}}</span>: <span class="ph">{{ipv4}}</span> <span class="ph">{{ipv6}}</span>"</code></pre>
+      </div>
+      <div class="table-scroll">
+        <table class="expand">
+          <caption>What each console receives</caption>
+          <thead><tr><th scope="col">VM</th><th scope="col">typed</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">101</th><td>echo "101 on node1: 192.0.2.11 2001:db8::11"</td></tr>
+            <tr><th scope="row">104</th><td>echo "104 on node2: 198.51.100.21 2001:db8::21"</td></tr>
+            <tr><th scope="row">107</th><td>echo "107 on node3: 203.0.113.41 2001:db8::41"</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul class="ticks">
+        <li><code>{{ipv4}}</code> and <code>{{ipv6}}</code> come from the QEMU guest agent or the container's interfaces. A VM without an address gets nothing typed.</li>
+        <li>Adjustable per-character delay (20 ms by default) for reliable input; optionally press <kbd>↵</kbd> after.</li>
+      </ul>
+    </div>
+    <figure>
+      <a class="shot" href="assets/shots/placeholders.png">
+        <picture>
+          <source srcset="assets/shots/placeholders.webp" type="image/webp">
+          <img src="assets/shots/placeholders.png" width="1600" height="1000" loading="lazy" decoding="async" alt="Nine consoles after one Type text command with placeholders: each console printed its own VMID, name, node and IPv4 address.">
+        </picture>
+        <span class="zoom" aria-hidden="true">ZOOM +</span>
+      </a>
+      <figcaption><b>Type text.</b> <code>{{name}}</code> becomes web-01, web-02, db-01 …</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- 04: or just one -->
+<section class="section" aria-labelledby="f4">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow"><span class="n">04</span> Or just one</p>
+      <h2 id="f4">Drive a single machine, right from your desktop.</h2>
+      <p class="lede soft">No Proxmox web interface, no browser tab, no hunting through the tree. The console you need is one click away, and so are its power buttons.</p>
+    </div>
+    <div class="trio">
+      <figure>
+        <a class="shot" href="assets/shots/solo.png">
+          <picture>
+            <source srcset="assets/shots/solo.webp" type="image/webp">
+            <img src="assets/shots/solo.png" width="1600" height="1000" loading="lazy" decoding="async" alt="Solo mode: one console in the grid has an amber outline and a SOLO label; only that VM receives keyboard and mouse input.">
+          </picture>
+          <span class="zoom" aria-hidden="true">ZOOM +</span>
+        </a>
+        <h3>Solo</h3>
+        <p>Click a console and it turns amber: keys and mouse go to that VM only. Hold <kbd>Esc</kbd> to let go.</p>
+      </figure>
+      <figure>
+        <a class="shot" href="assets/shots/power.png">
+          <picture>
+            <source srcset="assets/shots/power.webp" type="image/webp">
+            <img src="assets/shots/power.png" width="1600" height="1000" loading="lazy" decoding="async" alt="Power controls on a tile: the shutdown button is highlighted and asks for a second click; a powered-off VM next to it shows a start button.">
+          </picture>
+          <span class="zoom" aria-hidden="true">ZOOM +</span>
+        </a>
+        <h3>Power</h3>
+        <p>Start, shut down (ACPI) or hard stop a VM from its tile. Shutdown and stop ask for a second click.</p>
+      </figure>
+      <figure>
+        <a class="shot" href="assets/shots/maximized.png">
+          <picture>
+            <source srcset="assets/shots/maximized.webp" type="image/webp">
+            <img src="assets/shots/maximized.png" width="1600" height="1000" loading="lazy" decoding="async" alt="One console maximized to fill the whole VMherd window, showing a text-mode OS installer asking for a hostname.">
+          </picture>
+          <span class="zoom" aria-hidden="true">ZOOM +</span>
+        </a>
+        <h3>Maximize</h3>
+        <p>Blow any console up to the full window for an installer or a boot menu. <kbd>Esc</kbd> restores the grid.</p>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- 05: find fast -->
+<section class="section" aria-labelledby="f5">
+  <div class="wrap feature flip">
+    <div class="feature-text">
+      <p class="eyebrow"><span class="n">05</span> Filter and list</p>
+      <h2 id="f5">Find the right twelve out of hundreds.</h2>
+      <p class="lede">The VM list filters on name, VMID, node, status and tags as you type. Two operators, zero learning curve.</p>
+      <dl class="syntax">
+        <div><dt>web prod</dt><dd>space means AND: both must match</dd></div>
+        <div><dt>web, db</dt><dd>comma means OR: either one</dd></div>
+        <div><dt>web prod, db prod</dt><dd>combine them: web in prod, or db in prod</dd></div>
+        <div><dt>101
+102
+117</dt><dd>paste a column of VMIDs to select exactly those</dd></div>
+      </dl>
+      <ul class="ticks">
+        <li><strong>Running only</strong>, sortable columns (VMID, name, node, status, tags, uptime) and natural order: web-2 comes before web-10.</li>
+        <li>Click to add or remove, shift-click for a range, or <strong>+ All shown</strong>.</li>
+        <li>Keyboard-first: <kbd>/</kbd> opens the list, <kbd>Tab</kbd> and arrows move, <kbd>Space</kbd> picks, <kbd>Esc</kbd> closes.</li>
+      </ul>
+    </div>
+    <figure>
+      <a class="shot" href="assets/shots/picker.png">
+        <picture>
+          <source srcset="assets/shots/picker.webp" type="image/webp">
+          <img src="assets/shots/picker.png" width="1600" height="1000" loading="lazy" decoding="async" alt="The VM list over the grid: the filter reads web prod, db prod with Running only checked, and a sortable table lists matching VMs with VMID, name, node, status, tags and uptime.">
+        </picture>
+        <span class="zoom" aria-hidden="true">ZOOM +</span>
+      </a>
+      <figcaption><b>VM list.</b> Filter, sort, pick. Press <kbd>/</kbd> from anywhere.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- keyboard -->
+<section class="section" id="keyboard" aria-labelledby="kb">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow"><span class="n">&gt;_</span> Keyboard</p>
+      <h2 id="kb">Your hands never leave the keys.</h2>
+    </div>
+    <dl class="keyboard">
+      <div><dt><kbd>Enter</kbd></dt><dd>Type into all synced consoles (when nothing else has the keyboard)</dd></div>
+      <div><dt>Click a console</dt><dd>Type into that console only: <strong>SOLO</strong></dd></div>
+      <div><dt>Hold <kbd>Esc</kbd> 1 s</dt><dd>Stop typing into consoles; a short <kbd>Esc</kbd> goes to the consoles</dd></div>
+      <div><dt><kbd>/</kbd></dt><dd>Show or hide the VM list</dd></div>
+      <div><dt><kbd>Tab</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Space</kbd></dt><dd>In the VM list: move, add or remove a VM; <kbd>Esc</kbd> closes it</dd></div>
+      <div><dt><kbd>⌘</kbd> <kbd>V</kbd></dt><dd>Type the clipboard into the consoles</dd></div>
+      <div><dt><kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>In the Type text box: type it into all synced consoles</dd></div>
+      <div><dt><kbd>Esc</kbd></dt><dd>Restore a maximized console to the grid</dd></div>
+    </dl>
+  </div>
+</section>
+
+<!-- more -->
+<section class="section" id="security" aria-labelledby="more">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow"><span class="n">06</span> Under the hood</p>
+      <h2 id="more">Boring where it counts.</h2>
+      <p class="lede soft">Least privilege, secrets in the Keychain, pinned certificates. VMherd talks to your Proxmox servers and nothing else.</p>
+    </div>
+    <div class="cards">
+      <article class="card">
+        <span class="ico" aria-hidden="true">[token]</span>
+        <h3>API tokens, least privilege</h3>
+        <p>Log in with a Proxmox API token (<code>user@realm!name</code>), never a password. You decide what it may do: <code>VM.Audit</code> and <code>VM.Console</code>, plus <code>VM.PowerMgmt</code> for the power buttons.</p>
+      </article>
+      <article class="card">
+        <span class="ico" aria-hidden="true">[keychain]</span>
+        <h3>Secrets in your Keychain</h3>
+        <p>Token secrets are stored in your macOS Keychain, never in a settings file. Bookmarks and layout stay in the app's own sandbox container.</p>
+      </article>
+      <article class="card amber">
+        <span class="ico" aria-hidden="true">[sha-256]</span>
+        <h3>TLS pinned on first use</h3>
+        <p>HTTPS only for remote servers. Self-signed Proxmox certificates are pinned by SHA-256 fingerprint, like SSH host keys. A changed certificate is refused until you trust it again.</p>
+      </article>
+      <article class="card red">
+        <span class="ico" aria-hidden="true">[offline]</span>
+        <h3>No account, no analytics</h3>
+        <p>No sign-up, no telemetry, no update pings. VMherd connects only to the servers you add. Keys go only to the consoles you selected, while the VMherd window is focused.</p>
+      </article>
+      <article class="card steel">
+        <span class="ico" aria-hidden="true">[clusters]</span>
+        <h3>Multiple clusters</h3>
+        <p>Bookmark any number of Proxmox VE clusters or single nodes and switch between them from the top bar. The grid is remembered per cluster.</p>
+      </article>
+      <article class="card">
+        <span class="ico" aria-hidden="true">[rust]</span>
+        <h3>Native, in Rust</h3>
+        <p>Its own VNC client, written in Rust, no browser engine, no plugins. A universal app that runs natively on Apple silicon and Intel Macs.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- requirements + faq -->
+<section class="section" id="faq" aria-labelledby="need">
+  <div class="wrap two">
+    <div>
+      <p class="eyebrow"><span class="n">07</span> What you need</p>
+      <h2 id="need">Three things.</h2>
+      <ol class="needs">
+        <li><strong>A Mac</strong> with Apple silicon or an Intel processor.</li>
+        <li><strong>Proxmox VE</strong>, a cluster or a single node, reachable from your Mac over HTTPS (usually port 8006).</li>
+        <li><strong>An API token</strong> with <code>VM.Audit</code> and <code>VM.Console</code>, plus <code>VM.PowerMgmt</code> for the power buttons.</li>
+      </ol>
+      <div class="term">
+        <div class="term-head">On a Proxmox node: a user, role and token for VMherd</div>
+<pre><code><span class="c"># a role with just what VMherd needs</span>
+pveum role add VMherd --privs "VM.Audit VM.Console VM.PowerMgmt"
+pveum user add vmherd@pve
+pveum acl modify /vms --users vmherd@pve --roles VMherd
+<span class="c"># the token inherits the user's permissions</span>
+pveum user token add vmherd@pve grid --privsep 0</code></pre>
+      </div>
+      <p class="soft"><br>Leave out <code>VM.PowerMgmt</code> for a look-and-type-only token. Narrow <code>/vms</code> to a pool to limit which VMs VMherd can see.</p>
+    </div>
+    <div class="faq">
+      <p class="eyebrow"><span class="n">??</span> FAQ</p>
+      <h2>Questions, answered.</h2>
+      <details>
+        <summary>Does it work with a single node?</summary>
+        <div><p>Yes. Bookmark a standalone Proxmox VE node exactly like a cluster: its API URL, a token ID and the token secret.</p></div>
+      </details>
+      <details>
+        <summary>Which permissions does the token need?</summary>
+        <div><p><code>VM.Audit</code> to list VMs and <code>VM.Console</code> to open their consoles. Add <code>VM.PowerMgmt</code> if you want the start, shutdown and stop buttons. Grant them on <code>/vms</code>, or on a pool.</p></div>
+      </details>
+      <details>
+        <summary>Does it send keys to other apps?</summary>
+        <div><p>No. Keys only go to the consoles you selected (synced, or the one in solo) while the VMherd window is focused and the bar shows ON AIR or SOLO. VMherd needs no Accessibility or Input Monitoring permission, and releases all keys when the window loses focus.</p></div>
+      </details>
+      <details>
+        <summary>Is there a demo?</summary>
+        <div><p>Yes. Click <strong>Try the demo</strong> on the cluster screen to open a built-in demo cluster with simulated VMs: live consoles, power buttons and typing, all local. No Proxmox server needed.</p></div>
+      </details>
+      <details>
+        <summary>VMs and containers?</summary>
+        <div><p>Both: QEMU/KVM virtual machines and LXC containers show up in the VM list and open as tiles.</p></div>
+      </details>
+      <details>
+        <summary>What about keyboard layouts?</summary>
+        <div><p>Broadcast and solo keystrokes are sent as physical keys, so the guest's own layout applies, like a real keyboard. <strong>Type text</strong> sends US key codes, so for that the guest needs a US layout.</p></div>
+      </details>
+      <details>
+        <summary>Will it kick out my open Proxmox web console?</summary>
+        <div><p>No. VMherd opens consoles in shared mode, so a noVNC console in the Proxmox web interface stays connected.</p></div>
+      </details>
+      <details>
+        <summary>Is the source code available? What is the license?</summary>
+        <div>
+          <p>Yes. The source is on <a href="https://github.com/WietseWind/VMherd">GitHub</a>, source-available under the PolyForm Noncommercial License 1.0.0; it also builds for Linux and Windows.</p>
+          <p>The Mac App Store version is licensed under Apple's standard license agreement, and covers use at home and at work. See <a href="license/">License</a>.</p>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- final call to action -->
+<section class="section final" aria-labelledby="get">
+  <div class="wrap">
+    <img class="icon" src="assets/icon/icon-192.png" width="128" height="128" alt="" loading="lazy">
+    <h2 id="get">Round up your herd.</h2>
+    <p class="lede">All your Proxmox VE consoles in one native Mac window. <span class="nowrap">€19.99, one-time purchase.</span></p>
+    <div class="cta">
+      <a class="appstore" href="https://apps.apple.com/app/vmherd/id6816533992">
+        <img src="assets/badges/mac-app-store.svg" width="156" height="40" alt="Download on the Mac App Store" loading="lazy">
+        <span class="fallback" aria-hidden="true">Download on the Mac App Store</span>
+      </a>
+      <a class="src-link" href="https://github.com/WietseWind/VMherd">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg>
+        Source on GitHub <span class="arr" aria-hidden="true">&rarr;</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <h2>The Integrators BV</h2>
+        <address>
+          De Windturbine 7 · Unit 8619<br>
+          3815KP Amersfoort · The Netherlands<br>
+          KvK (Dutch CoC) # 64731464<br>
+          T. <a href="tel:+31332104141">+31 33 210 4141</a> · <a href="mailto:support@vmherd.app">support@vmherd.app</a>
+        </address>
+      </div>
+      <nav aria-label="Legal and support">
+        <h2>Help</h2>
+        <ul>
+          <li><a href="support/">Support</a></li>
+          <li><a href="privacy/">Privacy</a></li>
+          <li><a href="license/">License</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Elsewhere">
+        <h2>VMherd</h2>
+        <ul>
+          <li><a href="https://apps.apple.com/app/vmherd/id6816533992">Mac App Store</a></li>
+          <li><a href="https://github.com/WietseWind/VMherd">Source on GitHub</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="foot-legal">
+      <p>© 2026 The Integrators BV. All rights reserved.</p>
+      <p>Proxmox is a registered trademark of Proxmox Server Solutions GmbH. VMherd is not affiliated with or endorsed by Proxmox Server Solutions GmbH. Apple, the Apple logo, Mac and macOS are trademarks of Apple Inc., registered in the U.S. and other countries and regions. App Store is a service mark of Apple Inc.</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/site.js" defer></script>
+</body>
+</html>

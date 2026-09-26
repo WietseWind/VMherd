@@ -3,7 +3,7 @@
 [![CI](https://github.com/WietseWind/VMherd/actions/workflows/ci.yml/badge.svg)](https://github.com/WietseWind/VMherd/actions/workflows/ci.yml)
 [![Supply chain](https://github.com/WietseWind/VMherd/actions/workflows/supply-chain.yml/badge.svg)](https://github.com/WietseWind/VMherd/actions/workflows/supply-chain.yml)
 
-By The Integrators BV (NL), Wietse Wind · <https://github.com/WietseWind/VMherd>
+By The Integrators BV (NL), Wietse Wind · <https://vmherd.app> · <https://github.com/WietseWind/VMherd>
 
 Many Proxmox VM consoles in one window, and one keyboard for all of them.
 
@@ -62,7 +62,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 - **Linux**: needs the usual winit/wgpu deps (`libxkbcommon`, Wayland or X11, Vulkan or GL drivers). `packaging/linux/vmherd.desktop` + `assets/icon/vmherd-256.png` for menus. `tools/test-linux.sh` builds and tests it in Docker, with and without a Secret Service.
 - **Windows**: `cargo build --release -p vmherd`; the icon is embedded by `build.rs`.
 - Licenses: `tools/licenses.sh` regenerates `THIRD-PARTY-LICENSES.md` (all crates for all platforms + the bundled fonts, via `cargo-about`); ship it with every build (the macOS bundle includes it). Run it after dependency updates.
-- Icons: edit `assets/icon/vmherd.svg` (+ `vmherd-small.svg` for 16–64 px), then `tools/make-icons.sh`. The lead sheep shows a Proxmox-style X; the Proxmox logo is a trademark of Proxmox Server Solutions GmbH, so for a public release build the neutral set with `VARIANT=prompt tools/make-icons.sh` (`>_` on every screen).
+- Icons: edit `assets/icon/vmherd-prompt.svg` (+ `vmherd-prompt-small.svg` for 16–64 px), then `tools/make-icons.sh`. `VARIANT=proxmox` renders the private variant with a Proxmox-style X on the lead screen (`vmherd.svg`); the Proxmox logo is a trademark of Proxmox Server Solutions GmbH, so releases use the neutral `>_` set.
 
 ## CI and supply chain
 

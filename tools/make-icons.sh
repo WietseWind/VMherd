@@ -1,11 +1,12 @@
 #!/bin/bash
-# Regenerate all icon files from assets/icon/vmherd.svg (+ vmherd-small.svg for 16-64 px).
-# VARIANT=prompt uses the neutral vmherd-prompt*.svg (no Proxmox-style mark; for public distribution:
-# the Proxmox logo is a trademark of Proxmox Server Solutions GmbH).
+# Regenerate all icon files from assets/icon/vmherd-prompt.svg (+ vmherd-prompt-small.svg for 16-64 px):
+# the neutral `>_` design used for every release. VARIANT=proxmox renders vmherd.svg / vmherd-small.svg
+# instead (lead screen with a Proxmox-style X; the Proxmox logo is a trademark of Proxmox Server
+# Solutions GmbH, so that variant is for private builds only).
 # Needs rsvg-convert (librsvg) and ImageMagick; iconutil (macOS) for the .icns.
 set -euo pipefail
 cd "$(dirname "$0")/../assets/icon"
-if [ "${VARIANT:-}" = prompt ]; then big=vmherd-prompt.svg small=vmherd-prompt-small.svg; else big=vmherd.svg small=vmherd-small.svg; fi
+if [ "${VARIANT:-}" = proxmox ]; then big=vmherd.svg small=vmherd-small.svg; else big=vmherd-prompt.svg small=vmherd-prompt-small.svg; fi
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 png() { rsvg-convert -w "$2" -h "$2" "$1" -o "$3"; }
 

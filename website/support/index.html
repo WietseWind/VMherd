@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support · VMherd</title>
+<meta name="description" content="Get help with VMherd: email support, GitHub issues, and quick fixes for token permissions, certificate changes and keyboard layouts.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#0a0c0b">
+<link rel="canonical" href="https://vmherd.app/support/">
+<link rel="icon" href="../favicon.ico" sizes="48x48">
+<link rel="icon" href="../assets/icon/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="icon" href="../assets/icon/favicon-16.png" type="image/png" sizes="16x16">
+<link rel="apple-touch-icon" href="../assets/icon/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="stylesheet" href="../assets/css/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="VMherd">
+<meta property="og:title" content="Support · VMherd">
+<meta property="og:description" content="Get help with VMherd: email support, GitHub issues, and quick fixes for token permissions, certificate changes and keyboard layouts.">
+<meta property="og:image" content="https://vmherd.app/assets/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://vmherd.app/assets/img/og.png">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../" aria-label="VMherd home">
+      <img src="../assets/icon/logo-80.png" width="36" height="36" alt="">
+      <span class="wordmark">VM<b>HERD</b></span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a class="hide-sm" href="../#features">Features</a>
+      <a class="hide-sm" href="../#faq">FAQ</a>
+      <a href="../support/" aria-current="page">Support</a>
+      <a href="https://github.com/WietseWind/VMherd">GitHub</a>
+      <a class="btn btn-go" href="https://apps.apple.com/app/vmherd/id6816533992">Get it</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="page">
+  <div class="wrap prose">
+    <p class="eyebrow"><span class="n">//</span> Help</p>
+    <h1>Support</h1>
+    <p class="lede">Stuck, found a bug, or want a feature? We are happy to help.</p>
+
+    <div class="help-grid">
+      <article class="card">
+        <span class="ico" aria-hidden="true">[mail]</span>
+        <h2 class="h3">Email</h2>
+        <p><a href="mailto:support@vmherd.app">support@vmherd.app</a></p>
+        <p>For questions, problems and commercial licensing. We answer on Dutch business days, in English or Dutch.</p>
+      </article>
+      <article class="card steel">
+        <span class="ico" aria-hidden="true">[issues]</span>
+        <h2 class="h3">GitHub issues</h2>
+        <p><a href="https://github.com/WietseWind/VMherd/issues">github.com/WietseWind/VMherd/issues</a></p>
+        <p>For bug reports and feature requests in public. Never post token secrets, and leave out hostnames and addresses.</p>
+      </article>
+    </div>
+
+    <div class="callout"><p>When you report a problem, please include your VMherd version (ABOUT, top right in the app), your macOS version, your Proxmox VE version and what you expected to happen.</p></div>
+
+    <h2 id="troubleshooting">Quick troubleshooting</h2>
+
+    <h3 id="demo">Where is the demo?</h3>
+    <p>On the cluster screen, where your bookmarks are listed, click <strong>Try the demo</strong>. It opens a built-in demo cluster with simulated VMs: live consoles, power buttons and typing, all local on your Mac. No Proxmox server needed.</p>
+
+    <h3 id="permissions">The VM list is empty, a console does not open, or power buttons fail</h3>
+    <p>Check the permissions of your API token. VMherd needs <code>VM.Audit</code> to list VMs, <code>VM.Console</code> to open consoles and <code>VM.PowerMgmt</code> for start, shutdown and stop, on <code>/vms</code> or on a pool that holds your VMs.</p>
+    <p>Tokens created with <strong>privilege separation</strong> (the Proxmox default) do not inherit the user's permissions; give the token its own ACL:</p>
+    <div class="term"><div class="term-head">On a Proxmox node</div>
+<pre><code>pveum acl modify /vms --tokens 'vmherd@pve!grid' --roles VMherd</code></pre></div>
+    <p><br>The token ID in VMherd has the form <code>user@realm!tokenname</code>, for example <code>vmherd@pve!grid</code>.</p>
+
+    <h3 id="unreachable">VMherd cannot reach the server</h3>
+    <p>The API URL must be HTTPS, usually <code>https://pve.example.com:8006</code>. Check that your Mac can reach that address and port (VPN, firewall). Plain <code>http</code> is only accepted for <code>localhost</code>.</p>
+
+    <h3 id="certificate">"Certificate changed"</h3>
+    <p>VMherd pins a server's certificate by its SHA-256 fingerprint the first time you connect, like SSH host keys. If the certificate changes later, VMherd refuses to connect until you trust it again.</p>
+    <ul>
+      <li>If you renewed or replaced the certificate (a new ACME certificate, a reinstall, a new node), compare the fingerprint that VMherd shows with the one on the server: in the Proxmox web interface under <em>node → System → Certificates</em>, or on the node with <code>openssl x509 -in /etc/pve/local/pve-ssl.pem -noout -fingerprint -sha256</code> (use <code>pveproxy-ssl.pem</code> instead if you installed a custom or ACME certificate). If they match, choose to trust it.</li>
+      <li>If you did not change anything, do not trust it: something between your Mac and the server may be intercepting the connection.</li>
+    </ul>
+
+    <h3 id="layout">Wrong or missing characters with "Type text"</h3>
+    <p>Broadcast and solo keystrokes are sent as physical keys, so the guest's own keyboard layout applies, like a real keyboard. <strong>Type text</strong> sends US key codes one character at a time, so for that the guest needs a US keyboard layout. If characters get lost, raise the per-character delay next to the TYPE button: QEMU's keyboard queue holds only a few keys.</p>
+
+    <h3 id="keys">My keys do not reach a console</h3>
+    <ul>
+      <li>For broadcast, the bar at the bottom must show <strong>ON AIR</strong> (click it, or press <kbd>Enter</kbd> when nothing else has the keyboard), and the tile's red sync toggle must be on.</li>
+      <li>For a single console, click inside it: it shows an amber <strong>SOLO</strong> label.</li>
+      <li>Keys only go out while the VMherd window is focused, and only to consoles that are connected.</li>
+      <li>Hold <kbd>Esc</kbd> for one second to leave broadcast or solo mode; a short <kbd>Esc</kbd> is sent to the consoles.</li>
+    </ul>
+
+    <h3 id="commercial">Using VMherd at work</h3>
+    <p>The Mac App Store version is licensed under Apple's standard license agreement and covers use at work, on the Macs you own or control. See <a href="../license/">License</a>.</p>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <h2>The Integrators BV</h2>
+        <address>
+          De Windturbine 7 · Unit 8619<br>
+          3815KP Amersfoort · The Netherlands<br>
+          KvK (Dutch CoC) # 64731464<br>
+          T. <a href="tel:+31332104141">+31 33 210 4141</a> · <a href="mailto:support@vmherd.app">support@vmherd.app</a>
+        </address>
+      </div>
+      <nav aria-label="Legal and support">
+        <h2>Help</h2>
+        <ul>
+          <li><a href="../support/" aria-current="page">Support</a></li>
+          <li><a href="../privacy/">Privacy</a></li>
+          <li><a href="../license/">License</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Elsewhere">
+        <h2>VMherd</h2>
+        <ul>
+          <li><a href="https://apps.apple.com/app/vmherd/id6816533992">Mac App Store</a></li>
+          <li><a href="https://github.com/WietseWind/VMherd">Source on GitHub</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="foot-legal">
+      <p>© 2026 The Integrators BV. All rights reserved.</p>
+      <p>Proxmox is a registered trademark of Proxmox Server Solutions GmbH. VMherd is not affiliated with or endorsed by Proxmox Server Solutions GmbH. Apple, the Apple logo, Mac and macOS are trademarks of Apple Inc., registered in the U.S. and other countries and regions. App Store is a service mark of Apple Inc.</p>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/site.js" defer></script>
+</body>
+</html>

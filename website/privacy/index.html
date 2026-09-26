@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy policy · VMherd</title>
+<meta name="description" content="The VMherd app collects no personal data and has no analytics. This website sets no cookies. Privacy policy of The Integrators BV.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#0a0c0b">
+<link rel="canonical" href="https://vmherd.app/privacy/">
+<link rel="icon" href="../favicon.ico" sizes="48x48">
+<link rel="icon" href="../assets/icon/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="icon" href="../assets/icon/favicon-16.png" type="image/png" sizes="16x16">
+<link rel="apple-touch-icon" href="../assets/icon/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="stylesheet" href="../assets/css/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="VMherd">
+<meta property="og:title" content="Privacy policy · VMherd">
+<meta property="og:description" content="The VMherd app collects no personal data and has no analytics. This website sets no cookies. Privacy policy of The Integrators BV.">
+<meta property="og:image" content="https://vmherd.app/assets/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://vmherd.app/assets/img/og.png">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../" aria-label="VMherd home">
+      <img src="../assets/icon/logo-80.png" width="36" height="36" alt="">
+      <span class="wordmark">VM<b>HERD</b></span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a class="hide-sm" href="../#features">Features</a>
+      <a class="hide-sm" href="../#faq">FAQ</a>
+      <a href="../support/">Support</a>
+      <a href="https://github.com/WietseWind/VMherd">GitHub</a>
+      <a class="btn btn-go" href="https://apps.apple.com/app/vmherd/id6816533992">Get it</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="page">
+  <div class="wrap prose">
+    <p class="eyebrow"><span class="n">//</span> Legal</p>
+    <h1>Privacy policy</h1>
+    <p class="meta">Effective 27 September 2026 · applies to the VMherd app and to vmherd.app</p>
+
+    <p class="lede">Short version: the VMherd app collects no personal data, has no analytics or tracking, and talks only to the Proxmox VE servers you add. This website sets no cookies and runs no analytics. Nothing about you or your servers is sent to us.</p>
+
+    <nav class="toc" aria-label="Contents">
+      <ol>
+        <li><a href="#controller">Who we are</a></li>
+        <li><a href="#app">The VMherd app</a></li>
+        <li><a href="#apple">Buying through Apple</a></li>
+        <li><a href="#website">This website</a></li>
+        <li><a href="#support">Support email</a></li>
+        <li><a href="#rights">Your rights</a></li>
+        <li><a href="#children">Children</a></li>
+        <li><a href="#changes">Changes</a></li>
+      </ol>
+    </nav>
+
+    <h2 id="controller">1. Who we are</h2>
+    <p>The controller for the processing described here is:</p>
+    <address>
+  <strong>The Integrators BV</strong><br>
+  De Windturbine 7, Unit 8619<br>
+  3815KP Amersfoort, The Netherlands<br>
+  KvK (Dutch Chamber of Commerce) # 64731464<br>
+  T. <a href="tel:+31332104141">+31 33 210 4141</a> · <a href="mailto:support@vmherd.app">support@vmherd.app</a>
+</address>
+    <p>Questions about privacy: <a href="mailto:support@vmherd.app">support@vmherd.app</a>.</p>
+
+    <h2 id="app">2. The VMherd app</h2>
+    <p><strong>The app does not collect personal data and does not send any data to The Integrators BV.</strong> It contains no analytics, no tracking, no advertising, no crash reporting and no update checks, and it does not require an account.</p>
+    <h3>Network connections</h3>
+    <p>VMherd connects only to the Proxmox VE servers that you add yourself: over HTTPS to their API, and over a secure WebSocket for the console streams (usually port 8006). It opens no listening sockets and contacts no other servers. What you see on the consoles and what you type travels only between your Mac and your own servers.</p>
+    <h3>What is stored on your Mac</h3>
+    <ul>
+      <li><strong>Settings</strong>: your cluster bookmarks (name, API URL, API token ID), the pinned certificate fingerprints, the grid layout per cluster and your preferences. These are stored locally in the app's sandbox container on your Mac.</li>
+      <li><strong>Token secrets</strong>: stored only in your macOS Keychain, as the app's own Keychain items, never in the settings file. Deleting a bookmark removes its secret from the Keychain.</li>
+    </ul>
+    <p>This data stays on your Mac. We cannot see it and never receive it. Removing the app removes its container; your Keychain items can be removed by deleting the bookmarks first, or with the Keychain Access app.</p>
+    <h3>Your Proxmox servers</h3>
+    <p>Your Proxmox VE servers log their own activity, for example a console task for every console that VMherd opens. Those logs are on your servers and under your control; we have no access to them.</p>
+
+    <h2 id="apple">3. Buying through Apple</h2>
+    <p>VMherd is sold and delivered by Apple through the Mac App Store. Apple processes your purchase and payment under its own privacy policy; we do not receive your name, email address or payment details. Apple gives developers aggregated sales reports and, only if you chose to share analytics with app developers in your Mac's settings, aggregated usage statistics. We cannot identify you from these.</p>
+
+    <h2 id="website">4. This website</h2>
+    <p>vmherd.app is a static website. It sets <strong>no cookies</strong>, uses no local storage for tracking, runs no analytics and loads nothing from third parties: fonts, images and scripts are served from vmherd.app itself.</p>
+    <p>Like any web server, our hosting provider may keep standard server logs (IP address, date and time, requested page, browser user agent and referring page) to operate and secure the service. We do not use these logs to identify visitors or build profiles, and they are deleted after a limited period. The legal basis is our legitimate interest in running a secure website (Article 6(1)(f) GDPR).</p>
+    <p>Links to the Mac App Store and GitHub take you to those services, where their own privacy policies apply.</p>
+
+    <h2 id="support">5. Support email</h2>
+    <p>If you email <a href="mailto:support@vmherd.app">support@vmherd.app</a>, we use your email address and the contents of your message to answer you and to handle your request (Article 6(1)(b) and (f) GDPR). We keep this correspondence only as long as needed for that, and for any legal record-keeping obligations. We do not share it with others, except with the provider that hosts our email on our behalf.</p>
+    <p>Please do not send us API token secrets, passwords or other secrets. If you share screenshots or logs, remove hostnames and addresses you would rather keep private.</p>
+
+    <h2 id="rights">6. Your rights</h2>
+    <p>Under the General Data Protection Regulation (GDPR) you have the right to access the personal data we hold about you, and to have it corrected or erased. You may also ask us to restrict processing, object to processing, or receive your data in a portable format. To use these rights, email <a href="mailto:support@vmherd.app">support@vmherd.app</a>. Since the app stores nothing with us, in practice this concerns support correspondence only.</p>
+    <p>You also have the right to lodge a complaint with a supervisory authority. In the Netherlands this is the Autoriteit Persoonsgegevens (Dutch Data Protection Authority), <a href="https://autoriteitpersoonsgegevens.nl">autoriteitpersoonsgegevens.nl</a>.</p>
+
+    <h2 id="children">7. Children</h2>
+    <p>VMherd is a tool for server administration and is not directed at children. We do not knowingly collect data from children.</p>
+
+    <h2 id="changes">8. Changes</h2>
+    <p>If we change this policy, we will publish the new version on this page with a new effective date. If a change would affect how the app handles data, we will describe it in the app's release notes.</p>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <h2>The Integrators BV</h2>
+        <address>
+          De Windturbine 7 · Unit 8619<br>
+          3815KP Amersfoort · The Netherlands<br>
+          KvK (Dutch CoC) # 64731464<br>
+          T. <a href="tel:+31332104141">+31 33 210 4141</a> · <a href="mailto:support@vmherd.app">support@vmherd.app</a>
+        </address>
+      </div>
+      <nav aria-label="Legal and support">
+        <h2>Help</h2>
+        <ul>
+          <li><a href="../support/">Support</a></li>
+          <li><a href="../privacy/" aria-current="page">Privacy</a></li>
+          <li><a href="../license/">License</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Elsewhere">
+        <h2>VMherd</h2>
+        <ul>
+          <li><a href="https://apps.apple.com/app/vmherd/id6816533992">Mac App Store</a></li>
+          <li><a href="https://github.com/WietseWind/VMherd">Source on GitHub</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="foot-legal">
+      <p>© 2026 The Integrators BV. All rights reserved.</p>
+      <p>Proxmox is a registered trademark of Proxmox Server Solutions GmbH. VMherd is not affiliated with or endorsed by Proxmox Server Solutions GmbH. Apple, the Apple logo, Mac and macOS are trademarks of Apple Inc., registered in the U.S. and other countries and regions. App Store is a service mark of Apple Inc.</p>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/site.js" defer></script>
+</body>
+</html>
