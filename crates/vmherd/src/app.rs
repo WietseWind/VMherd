@@ -39,6 +39,16 @@ const MANY_CONSOLES: usize = 24;
 pub const AUTHOR: &str = "By The Integrators BV (NL), Wietse Wind";
 pub const REPO_URL: &str = "https://github.com/WietseWind/VMherd";
 pub const README_URL: &str = "https://github.com/WietseWind/VMherd#readme";
+/// Website, privacy policy (App Review guideline 5.1.1(i): reachable from inside the app) and
+/// support, shown in About and under the clusters.
+pub const SITE_LINKS: &[(&str, &str)] = &[
+    ("vmherd.app", "https://vmherd.app"),
+    ("Privacy policy", "https://vmherd.app/privacy/"),
+    ("Support", "https://vmherd.app/support/"),
+];
+/// Apple's standard license agreement, which covers the App Store version.
+#[cfg(feature = "mas")]
+const APPLE_EULA_URL: &str = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
 /// Holding Esc this long leaves broadcast / solo mode (a shorter press is sent to the consoles).
 const ESC_HOLD: Duration = Duration::from_secs(1);
 
@@ -1157,16 +1167,13 @@ impl App {
                 ui.add_space(4.0);
                 ui.label(RichText::new(AUTHOR).font(theme::bold(15.0)).color(theme::TEXT));
                 ui.add_space(2.0);
-                ui.horizontal(|ui| {
-                    // centre the two links
-                    let w = 290.0_f32.min(ui.available_width());
-                    ui.add_space(((ui.available_width() - w) / 2.0).max(0.0));
-                    ui.hyperlink_to(RichText::new("github.com/WietseWind/VMherd").font(theme::mono(12.0)), REPO_URL)
-                        .on_hover_text("Open the project page in your browser");
-                    ui.label(RichText::new("·").color(theme::DIM));
-                    ui.hyperlink_to(RichText::new("README").font(theme::mono(12.0)), README_URL)
-                        .on_hover_text("Open the documentation in your browser");
-                });
+                widgets::link_row(
+                    ui,
+                    &[("github.com/WietseWind/VMherd", REPO_URL), ("README", README_URL)],
+                    12.0,
+                    true,
+                );
+                widgets::link_row(ui, SITE_LINKS, 12.0, true);
             });
             ui.add_space(10.0);
             ui.label(widgets::spaced("KEYBOARD", theme::bold(11.0), theme::MUTED, 2.0));
@@ -1198,23 +1205,19 @@ impl App {
             });
             ui.add_space(10.0);
             ui.label(widgets::spaced("LICENSE", theme::bold(11.0), theme::MUTED, 2.0));
-            ui.label(
-                RichText::new(
-                    "Free for noncommercial use (PolyForm Noncommercial 1.0.0). Commercial use, also inside a \
-                     company, needs a commercial license from The Integrators BV (NL): ask via the project page.",
-                )
-                .color(theme::TEXT),
-            );
+            license_text(ui);
             ui.add_space(10.0);
             ui.label(widgets::spaced("CREDITS", theme::bold(11.0), theme::MUTED, 2.0));
+            // macOS uses the system TLS, the other platforms rustls
+            let crates = if cfg!(target_os = "macos") { "egui, tokio" } else { "egui, tokio, rustls" };
             ui.label(
-                RichText::new(
+                RichText::new(format!(
                     "Fonts: Barlow and JetBrains Mono (SIL Open Font License 1.1); egui's bundled fonts. \
-                     Built with egui, tokio, rustls and other open-source Rust crates: their licenses are in \
+                     Built with {crates} and other open-source Rust crates: their licenses are in \
                      THIRD-PARTY-LICENSES.md, shipped with the app. Proxmox is a registered trademark of \
                      Proxmox Server Solutions GmbH. VMherd is not affiliated with or endorsed by Proxmox Server \
                      Solutions GmbH.",
-                )
+                ))
                 .color(theme::MUTED)
                 .small(),
             );
@@ -1381,6 +1384,36 @@ impl App {
     }
 }
 
+/// The About box's license paragraph. App Store version: Apple's standard license agreement, at
+/// home and at work; nothing there points to buying a license elsewhere (guideline 3.1.1).
+#[cfg(feature = "mas")]
+fn license_text(ui: &mut Ui) {
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 0.0;
+        ui.label(RichText::new("This App Store version is licensed to you under ").color(theme::TEXT));
+        ui.hyperlink_to("Apple's standard license agreement", APPLE_EULA_URL);
+        ui.label(RichText::new(" and may be used at home and at work.").color(theme::TEXT));
+    });
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 0.0;
+        ui.label(RichText::new("Source code: ").color(theme::MUTED));
+        ui.hyperlink_to("github.com/WietseWind/VMherd", REPO_URL);
+        ui.label(RichText::new(" (PolyForm Noncommercial 1.0.0).").color(theme::MUTED));
+    });
+}
+
+/// The About box's license paragraph (builds from the project page).
+#[cfg(not(feature = "mas"))]
+fn license_text(ui: &mut Ui) {
+    ui.label(
+        RichText::new(
+            "Free for noncommercial use (PolyForm Noncommercial 1.0.0). Commercial use, also inside a \
+             company, needs a commercial license from The Integrators BV (NL): ask via the project page.",
+        )
+        .color(theme::TEXT),
+    );
+}
+
 /// Run futures concurrently and collect their results in order (no extra dependency needed).
 async fn futures_join_all<F>(futures: impl IntoIterator<Item = F>) -> Vec<F::Output>
 where
@@ -1526,7 +1559,7 @@ impl eframe::App for App {
             } else {
                 ui.painter().rect_filled(ui.max_rect(), 0.0, theme::BG);
                 widgets::grid_background(ui.painter(), ui.max_rect());
-                if let Some(action) = self.clusters.ui(ui, &self.cfg, &self.status) {
+                if let Some(action) = self.clusters.ui(ui, &self.cfg, &self.status, self.persist) {
                     match action {
                         ClusterAction::Connect(id) => self.connect(id),
                         ClusterAction::Demo => self.connect_demo(Vec::new()),

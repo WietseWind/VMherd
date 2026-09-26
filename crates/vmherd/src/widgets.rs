@@ -4,8 +4,8 @@ use std::f32::consts::PI;
 
 use egui::text::{LayoutJob, TextFormat};
 use egui::{
-    Color32, CornerRadius, CursorIcon, FontId, Id, Mesh, Painter, Pos2, Rect, Response, Sense, Shadow, Shape, Stroke,
-    StrokeKind, Ui, Vec2, pos2, vec2,
+    Color32, CornerRadius, CursorIcon, FontId, Id, Mesh, Painter, Pos2, Rect, Response, RichText, Sense, Shadow, Shape,
+    Stroke, StrokeKind, Ui, Vec2, pos2, vec2,
 };
 
 use crate::theme;
@@ -67,6 +67,28 @@ pub fn spaced(text: &str, font: FontId, color: Color32, spacing: f32) -> LayoutJ
 
 pub fn plain(text: &str, font: FontId, color: Color32) -> LayoutJob {
     spaced(text, font, color, 0.0)
+}
+
+/// `text · text · …` links (label, URL) in the mono font, centred in the available width when
+/// `centred`.
+pub fn link_row(ui: &mut Ui, links: &[(&str, &str)], size: f32, centred: bool) {
+    let font = theme::mono(size);
+    ui.horizontal(|ui| {
+        if centred {
+            let width =
+                |t: &str| ui.ctx().fonts_mut(|f| f.layout_no_wrap(t.to_owned(), font.clone(), theme::DIM).size().x);
+            let n = links.len() as f32;
+            let text: f32 = links.iter().map(|(t, _)| width(t)).sum();
+            let total = text + (n - 1.0) * width("·") + (2.0 * n - 2.0) * ui.spacing().item_spacing.x;
+            ui.add_space(((ui.available_width() - total) / 2.0).max(0.0));
+        }
+        for (i, (text, url)) in links.iter().enumerate() {
+            if i > 0 {
+                ui.label(RichText::new("·").font(font.clone()).color(theme::DIM));
+            }
+            ui.hyperlink_to(RichText::new(*text).font(font.clone()), *url);
+        }
+    });
 }
 
 /// Vertical gradient (no rounding; use for bars and backgrounds).

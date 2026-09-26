@@ -300,7 +300,8 @@ impl ClustersUi {
         ui.label(RichText::new("Many Proxmox VM consoles. One keyboard.").color(theme::MUTED));
     }
 
-    pub fn ui(&mut self, ui: &mut Ui, cfg: &Config, status: &Status) -> Option<ClusterAction> {
+    /// `saves`: false in a `--demo` session, where nothing is saved.
+    pub fn ui(&mut self, ui: &mut Ui, cfg: &Config, status: &Status, saves: bool) -> Option<ClusterAction> {
         let mut action = None;
         let width = ui.available_width().min(760.0);
         ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
@@ -357,15 +358,18 @@ impl ClustersUi {
                         });
                     }
                     ui.add_space(24.0);
-                    if let Some(path) = Config::path() {
-                        ui.label(
-                            RichText::new(format!(
+                    let saved_where = if !saves {
+                        Some("Started with --demo: nothing is saved in this session.".to_owned())
+                    } else {
+                        Config::path().map(|path| {
+                            format!(
                                 "Bookmarks are saved in {}. Token secrets never go into that file.",
                                 crate::config::tilde(&path),
-                            ))
-                            .font(theme::mono(11.0))
-                            .color(theme::DIM),
-                        );
+                            )
+                        })
+                    };
+                    if let Some(text) = saved_where {
+                        ui.label(RichText::new(text).font(theme::mono(11.0)).color(theme::DIM));
                     }
                     ui.add_space(6.0);
                     ui.horizontal(|ui| {
@@ -382,6 +386,7 @@ impl ClustersUi {
                         ui.label(RichText::new("·").font(theme::mono(11.0)).color(theme::DIM));
                         ui.hyperlink_to(RichText::new("README").font(theme::mono(11.0)), crate::app::README_URL);
                     });
+                    widgets::link_row(ui, crate::app::SITE_LINKS, 11.0, false);
                 });
             });
         });
