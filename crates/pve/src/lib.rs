@@ -4,7 +4,9 @@
 //! * TLS with certificate pinning (trust on first use): a pinned SHA-256 fingerprint of the
 //!   server's leaf certificate is accepted as is (like SSH host keys, no name/expiry checks);
 //!   without a pin the OS trust store decides. When verification fails, the error carries the
-//!   presented fingerprint so the UI can ask the user to trust (pin) it.
+//!   presented fingerprint so the UI can ask the user to trust (pin) it. The check completes
+//!   before any request is written. macOS uses the system TLS stack (Security.framework, so
+//!   only the operating system's cryptography), other platforms rustls.
 //! * `http://` base URLs are allowed (no TLS) for tests against a mock.
 //! * The noVNC websocket (`vncwebsocket`) is exposed as a plain `AsyncRead + AsyncWrite`
 //!   byte stream, ready for `rfb::run`.
@@ -12,6 +14,7 @@
 mod api;
 mod client;
 mod error;
+mod net;
 mod tls;
 mod types;
 mod ws;

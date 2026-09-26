@@ -1,12 +1,18 @@
+use std::error::Error as StdError;
 use std::sync::Arc;
 use std::time::Duration;
 
-use reqwest::RequestBuilder;
-use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
+use bytes::Bytes;
+use http_body_util::{BodyExt, Full};
+use hyper::header::{AUTHORIZATION, CONTENT_TYPE, HeaderValue};
+use hyper::{Method, Request};
+use hyper_util::client::legacy::Client as HttpClient;
+use hyper_util::rt::{TokioExecutor, TokioTimer};
 use serde::de::DeserializeOwned;
 use url::Url;
 
 use crate::error::error_chain;
+use crate::net::{Connector, Server};
 use crate::tls::Tls;
 use crate::{
     Endpoint, Error, GuestIps, PowerAction, TaskStatus, Version, VmKind, VmRef, VmResource, VncProxy, VncStream, api,
@@ -15,7 +21,9 @@ use crate::{
 
 /// `User-Agent` of every request.
 pub(crate) const USER_AGENT: &str = concat!("vmherd/", env!("CARGO_PKG_VERSION"));
+/// TCP connect + TLS handshake (with the certificate check) of a REST connection.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+/// A whole REST exchange: connect, request, response and body.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Cheap to clone (shared connection pool).
@@ -31,7 +39,9 @@ struct Inner {
     host: String,
     /// `PVEAPIToken=...`, marked sensitive.
     auth: HeaderValue,
-    http: reqwest::Client,
+    /// Where every connection goes (REST and websocket alike).
+    server: Arc<Server>,
+    http: HttpClient<Connector, Full<Bytes>>,
     tls: Tls,
 }
 
@@ -48,9 +58,10 @@ impl Client {
         let base = normalize_base_url(&endpoint.url)?;
         let host = host_label(&base);
         let auth = auth_header(&endpoint.token_id, &endpoint.token_secret)?;
+        let server = Arc::new(Server::from_url(&base, &host)?);
         let tls = Tls::new(endpoint.pinned_sha256)?;
-        let http = build_http(&tls, &auth)?;
-        Ok(Self { inner: Arc::new(Inner { base, host, auth, http, tls }) })
+        let http = build_http(&server, &tls);
+        Ok(Self { inner: Arc::new(Inner { base, host, auth, server, http, tls }) })
     }
 
     /// `https://host:port` as configured.
@@ -97,7 +108,7 @@ impl Client {
         let mut url = self.api_url(&guest_segments(vm, &["vncwebsocket"])?)?;
         url.query_pairs_mut().append_pair("port", &proxy.port.to_string()).append_pair("vncticket", &proxy.ticket);
         tracing::debug!(node = %vm.node, vmid = vm.vmid, port = proxy.port, "opening the console websocket");
-        ws::connect(ws::Target { url, auth: &self.inner.auth, tls: &self.inner.tls, host: &self.inner.host }).await
+        ws::connect(ws::Target { url, auth: &self.inner.auth, tls: &self.inner.tls, server: &self.inner.server }).await
     }
 
     /// `vnc_proxy` + `vnc_connect`; returns the stream and the VNC password.
@@ -153,35 +164,69 @@ impl Client {
 
     async fn get<T: DeserializeOwned>(&self, url: Url) -> Result<T, Error> {
         tracing::debug!(path = url.path(), "GET");
-        self.execute(self.inner.http.get(url)).await
+        self.execute(self.request(Method::GET, &url, None)?).await
     }
 
     async fn post<T: DeserializeOwned>(&self, url: Url, form: &[(&str, &str)]) -> Result<T, Error> {
         tracing::debug!(path = url.path(), "POST");
-        self.execute(self.inner.http.post(url).form(form)).await
+        let body = url::form_urlencoded::Serializer::new(String::new()).extend_pairs(form).finish();
+        self.execute(self.request(Method::POST, &url, Some(body))?).await
+    }
+
+    /// A request with the token and user agent headers (and a form body, if any).
+    fn request(&self, method: Method, url: &Url, form: Option<String>) -> Result<Request<Full<Bytes>>, Error> {
+        let mut request = Request::builder()
+            .method(method)
+            .uri(url.as_str())
+            .header(AUTHORIZATION, self.inner.auth.clone())
+            .header(hyper::header::USER_AGENT, HeaderValue::from_static(USER_AGENT));
+        if form.is_some() {
+            request = request.header(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded"));
+        }
+        // The error text never contains the URL or the headers.
+        request
+            .body(Full::new(Bytes::from(form.unwrap_or_default())))
+            .map_err(|e| Error::Config(format!("cannot build the request: {e}")))
     }
 
     /// Sends the request and decodes `data`, mapping HTTP / transport failures.
-    async fn execute<T: DeserializeOwned>(&self, request: RequestBuilder) -> Result<T, Error> {
-        let response = request.send().await.map_err(|e| self.transport_error(e))?;
-        let status = response.status();
+    async fn execute<T: DeserializeOwned>(&self, request: Request<Full<Bytes>>) -> Result<T, Error> {
+        let exchange = async {
+            let response = self.inner.http.request(request).await.map_err(|e| self.transport_error(&e))?;
+            let (head, body) = response.into_parts();
+            Ok::<_, Error>((head, body.collect().await.map(|b| b.to_bytes())))
+        };
+        let (head, body) = tokio::time::timeout(REQUEST_TIMEOUT, exchange)
+            .await
+            .map_err(|_| Error::Network { host: self.inner.host.clone(), detail: "request timed out".to_owned() })??;
+        let status = head.status;
         if !status.is_success() {
-            let reason = reason_phrase(&response);
-            let body = response.bytes().await.unwrap_or_default();
+            let reason = reason_phrase(&head);
+            let body = body.unwrap_or_default();
             let message = api::error_message(&body, &reason);
             tracing::debug!(status = status.as_u16(), %message, "API error");
             return Err(Error::Api { status: status.as_u16(), message });
         }
-        let body = response.bytes().await.map_err(|e| self.transport_error(e))?;
+        let body = body.map_err(|e| self.transport_error(&e))?;
         api::decode_data(&body)
     }
 
-    fn transport_error(&self, err: reqwest::Error) -> Error {
-        let err = err.without_url();
-        if let Some(problem) = self.inner.tls.rejection_for(&err) {
-            return Error::UntrustedCert(problem);
+    /// A refused certificate or connect failure as the connector reported it (it travels as
+    /// the source of hyper's error, so this is exact even with concurrent connects), else a
+    /// network error with the whole chain.
+    fn transport_error(&self, err: &(dyn StdError + 'static)) -> Error {
+        let mut next = Some(err);
+        while let Some(e) = next {
+            match e.downcast_ref::<Error>() {
+                Some(Error::UntrustedCert(problem)) => return Error::UntrustedCert(problem.clone()),
+                Some(Error::Network { host, detail }) => {
+                    return Error::Network { host: host.clone(), detail: detail.clone() };
+                }
+                Some(other) => return Error::Network { host: self.inner.host.clone(), detail: other.to_string() },
+                None => next = e.source(),
+            }
         }
-        Error::Network { host: self.inner.host.clone(), detail: error_chain(&err) }
+        Error::Network { host: self.inner.host.clone(), detail: error_chain(err) }
     }
 }
 
@@ -212,7 +257,7 @@ fn host_label(base: &Url) -> String {
     }
 }
 
-/// `PVEAPIToken=<id>=<secret>` as a sensitive header value (never logged by reqwest / http).
+/// `PVEAPIToken=<id>=<secret>` as a sensitive header value (never logged by hyper / http).
 fn auth_header(token_id: &str, secret: &str) -> Result<HeaderValue, Error> {
     let token_id = token_id.trim();
     let secret = secret.trim();
@@ -288,31 +333,23 @@ fn api_url<S: AsRef<str>>(base: &Url, segments: &[S]) -> Result<Url, Error> {
     Ok(url)
 }
 
-/// The reqwest client: preconfigured rustls, timeouts, no redirects, token header, and no
-/// proxy (`*_PROXY` variables and system settings are ignored), so REST calls take the same
-/// direct path as the console websocket and the token is never handed to a proxy.
-fn build_http(tls: &Tls, auth: &HeaderValue) -> Result<reqwest::Client, Error> {
-    let mut headers = HeaderMap::new();
-    headers.insert(AUTHORIZATION, auth.clone());
-    reqwest::Client::builder()
-        .no_proxy()
-        .tls_backend_preconfigured(rustls::ClientConfig::clone(&tls.config))
-        .connect_timeout(CONNECT_TIMEOUT)
-        .timeout(REQUEST_TIMEOUT)
-        .redirect(reqwest::redirect::Policy::none())
-        .user_agent(USER_AGENT)
-        .default_headers(headers)
-        .build()
-        .map_err(|e| Error::Config(format!("cannot set up the HTTP client: {}", error_chain(&e))))
+/// The pooled HTTP/1.1 client over [`Connector`]: every connection goes straight to the
+/// cluster (no proxy, so the token is never handed to one) and is used only after its TLS
+/// certificate was accepted. hyper follows no redirects.
+fn build_http(server: &Arc<Server>, tls: &Tls) -> HttpClient<Connector, Full<Bytes>> {
+    HttpClient::builder(TokioExecutor::new()).pool_timer(TokioTimer::new()).build(Connector::new(
+        server.clone(),
+        tls.clone(),
+        CONNECT_TIMEOUT,
+    ))
 }
 
 /// The reason phrase as sent (Proxmox puts error texts there), else the canonical one.
-fn reason_phrase(response: &reqwest::Response) -> String {
-    response
-        .extensions()
+fn reason_phrase(head: &hyper::http::response::Parts) -> String {
+    head.extensions
         .get::<hyper::ext::ReasonPhrase>()
         .and_then(|reason| std::str::from_utf8(reason.as_bytes()).ok())
-        .or_else(|| response.status().canonical_reason())
+        .or_else(|| head.status.canonical_reason())
         .unwrap_or_default()
         .to_owned()
 }

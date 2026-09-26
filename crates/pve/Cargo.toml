@@ -11,13 +11,17 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-reqwest.workspace = true
-# `ext::ReasonPhrase` (Proxmox puts error texts in the HTTP reason phrase)
+# HTTP/1.1 client (REST pool and the websocket upgrade) over our own connector, which finishes
+# the TLS handshake and the certificate check before hyper may write a byte.
 hyper = { workspace = true, features = ["http1", "client"] }
-rustls.workspace = true
-rustls-platform-verifier.workspace = true
-tokio-rustls.workspace = true
-tokio-tungstenite.workspace = true
+hyper-util = { workspace = true, features = ["client-legacy", "http1", "tokio"] }
+http-body-util.workspace = true
+tower-service.workspace = true
+# websocket framing only (the upgrade itself goes through hyper)
+tokio-websockets.workspace = true
+getrandom.workspace = true
+base64.workspace = true
+sha1_smol.workspace = true
 tokio.workspace = true
 futures-util.workspace = true
 bytes.workspace = true
@@ -27,12 +31,27 @@ url.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-# Only for these features: they compile `log` trace records out of the whole binary, because
-# tungstenite trace-logs the raw console upgrade request (API token, vncticket) and every frame
-# payload (keystrokes). tracing's own macros are not affected.
+# Only for these features: they compile `log` trace records out of the whole binary, so no
+# dependency can trace-log the upgrade request (API token, vncticket) or frame payloads
+# (keystrokes). tracing's own macros are not affected.
 log = { workspace = true, features = ["max_level_debug", "release_max_level_debug"] }
+
+# TLS: Secure Transport + the system trust store (Security.framework) on macOS, so the app uses
+# only the operating system's cryptography there; rustls (aws-lc-rs) with the platform verifier
+# elsewhere.
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework.workspace = true
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+rustls.workspace = true
+rustls-platform-verifier.workspace = true
+tokio-rustls.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
+# local TLS / websocket test servers (never shipped)
+rustls.workspace = true
+tokio-rustls.workspace = true
+tokio-tungstenite.workspace = true
 # self-signed certificates for the local TLS test servers
 rcgen = { version = "0.14", default-features = false, features = ["aws_lc_rs"] }

@@ -1,45 +1,47 @@
 //! Websocket (binary messages) as an `AsyncRead + AsyncWrite` byte stream.
 
 use std::io;
-use std::net::{IpAddr, SocketAddr};
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
 use std::time::Duration;
 
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use bytes::{Buf, Bytes};
 use futures_util::{Sink, Stream};
-use reqwest::header::HeaderValue;
-use rustls::pki_types::ServerName;
+use http_body_util::{BodyExt, Empty, Limited};
+use hyper::header::{
+    AUTHORIZATION, CONNECTION, HOST, HeaderMap, HeaderValue, SEC_WEBSOCKET_ACCEPT, SEC_WEBSOCKET_KEY,
+    SEC_WEBSOCKET_PROTOCOL, SEC_WEBSOCKET_VERSION, UPGRADE, USER_AGENT,
+};
+use hyper::{Request, StatusCode};
+use hyper_util::rt::TokioIo;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-use tokio::net::TcpStream;
-use tokio_tungstenite::WebSocketStream;
-use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-use tokio_tungstenite::tungstenite::error::ProtocolError;
-use tokio_tungstenite::tungstenite::handshake::client::Request;
-use tokio_tungstenite::tungstenite::http::header::{AUTHORIZATION, SEC_WEBSOCKET_PROTOCOL, USER_AGENT};
-use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
-use tokio_tungstenite::tungstenite::{self, Message};
-use url::{Host, Url};
+use tokio_websockets::{Message, WebSocketStream};
+use url::{Position, Url};
 
 use crate::error::error_chain;
+use crate::net::{self, Server, Transport};
 use crate::tls::Tls;
 use crate::{Error, api};
 
-const TCP_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
-const TLS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 const UPGRADE_TIMEOUT: Duration = Duration::from_secs(15);
 /// Largest single websocket message produced by one `poll_write`.
 const MAX_WRITE_CHUNK: usize = 64 * 1024;
+/// Largest error body read from a refused upgrade.
+const MAX_ERROR_BODY: usize = 64 * 1024;
+/// RFC 6455: appended to `Sec-WebSocket-Key` for `Sec-WebSocket-Accept`.
+const ACCEPT_GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 /// The console byte stream (websocket underneath). Dropping it closes the connection.
 ///
 /// Reading returns EOF when the session ends normally, which with pveproxy is usually a plain
 /// socket shutdown rather than a websocket close frame (see `is_end_of_session`).
 ///
-/// Logging: tungstenite logs the raw upgrade request (API token, `vncticket`) and every frame
-/// payload (keystrokes) through the `log` crate at trace level. This crate compiles `log`
-/// trace records out (`log` features `max_level_debug` / `release_max_level_debug`), so they
-/// cannot reach a log sink whatever `RUST_LOG` says.
+/// Logging: nothing here logs the upgrade request (API token, `vncticket`) or frame payloads
+/// (keystrokes); as a safeguard for dependencies this crate also compiles `log` trace records
+/// out (`log` features `max_level_debug` / `release_max_level_debug`), so they cannot reach a
+/// log sink whatever `RUST_LOG` says.
 pub struct VncStream {
     pub(crate) inner: Pin<Box<dyn Duplex>>,
 }
@@ -77,124 +79,118 @@ pub(crate) struct Target<'a> {
     pub(crate) url: Url,
     pub(crate) auth: &'a HeaderValue,
     pub(crate) tls: &'a Tls,
-    /// `host:port`, for error messages.
-    pub(crate) host: &'a str,
+    /// The cluster the URL points to.
+    pub(crate) server: &'a Server,
 }
 
-/// TCP connect, TLS (for `https`), websocket upgrade.
+/// TCP connect, TLS (for `https`, with the certificate check), websocket upgrade.
 pub(crate) async fn connect(target: Target<'_>) -> Result<VncStream, Error> {
-    let secure = match target.url.scheme() {
-        "https" => true,
-        "http" => false,
-        other => return Err(Error::Config(format!("unsupported URL scheme {other}"))),
-    };
-    let (host, port) = host_and_port(&target.url)?;
-    let request = upgrade_request(&target.url, secure, target.auth)?;
-    let tcp = connect_tcp(&host, port, target.host).await?;
-    if secure {
-        let tls = tls_handshake(tcp, &host, &target).await?;
-        upgrade(tls, request, target.host).await
-    } else {
-        upgrade(tcp, request, target.host).await
-    }
+    let key = new_key()?;
+    let request = upgrade_request(&target.url, target.auth, &key)?;
+    let transport = net::connect(target.server, target.tls).await?;
+    upgrade(transport, request, &key, &target.server.label).await
 }
 
-fn host_and_port(url: &Url) -> Result<(Host<String>, u16), Error> {
-    let host = url.host().map(|h| h.to_owned()).ok_or_else(|| Error::Config("the URL has no host".to_owned()))?;
-    let port = url.port_or_known_default().ok_or_else(|| Error::Config("the URL has no port".to_owned()))?;
-    Ok((host, port))
+/// A fresh `Sec-WebSocket-Key` (16 random bytes from the operating system, base64).
+fn new_key() -> Result<String, Error> {
+    let mut nonce = [0u8; 16];
+    getrandom::fill(&mut nonce).map_err(|e| Error::WebSocket(format!("no random bytes for the handshake: {e}")))?;
+    Ok(BASE64.encode(nonce))
 }
 
-/// The GET upgrade request for `ws(s)://...` with token, sub-protocol and user agent headers.
-fn upgrade_request(url: &Url, secure: bool, auth: &HeaderValue) -> Result<Request, Error> {
-    let mut ws_url = url.clone();
-    ws_url
-        .set_scheme(if secure { "wss" } else { "ws" })
-        .map_err(|()| Error::Config("cannot build the websocket URL".to_owned()))?;
-    // tungstenite's error texts do not include the URL (which carries the ticket).
-    let mut request = ws_url.as_str().into_client_request().map_err(|e| Error::WebSocket(e.to_string()))?;
-    let headers = request.headers_mut();
-    // `auth` is marked sensitive, but that does not help here: tungstenite serializes the
-    // request itself and trace-logs it verbatim (token and ticket). Those `log` records are
-    // compiled out, see `VncStream`.
-    headers.insert(AUTHORIZATION, auth.clone());
-    headers.insert(SEC_WEBSOCKET_PROTOCOL, HeaderValue::from_static("binary"));
-    headers.insert(USER_AGENT, HeaderValue::from_static(crate::client::USER_AGENT));
-    Ok(request)
+/// The `Sec-WebSocket-Accept` the server must answer for `key`.
+fn accept_key(key: &str) -> String {
+    let mut sha1 = sha1_smol::Sha1::new();
+    sha1.update(key.as_bytes());
+    sha1.update(ACCEPT_GUID.as_bytes());
+    BASE64.encode(sha1.digest().bytes())
 }
 
-async fn connect_tcp(host: &Host<String>, port: u16, label: &str) -> Result<TcpStream, Error> {
-    let network = |detail: String| Error::Network { host: label.to_owned(), detail };
-    let connecting = async {
-        match host {
-            Host::Domain(domain) => TcpStream::connect((domain.as_str(), port)).await,
-            Host::Ipv4(ip) => TcpStream::connect(SocketAddr::new(IpAddr::V4(*ip), port)).await,
-            Host::Ipv6(ip) => TcpStream::connect(SocketAddr::new(IpAddr::V6(*ip), port)).await,
+/// The GET upgrade request (origin form) with token, sub-protocol and user agent headers.
+fn upgrade_request(url: &Url, auth: &HeaderValue, key: &str) -> Result<Request<Empty<Bytes>>, Error> {
+    // `auth` is marked sensitive: http / hyper never print it.
+    Request::get(&url[Position::BeforePath..Position::AfterQuery])
+        .header(HOST, &url[Position::BeforeHost..Position::AfterPort])
+        .header(CONNECTION, "Upgrade")
+        .header(UPGRADE, "websocket")
+        .header(SEC_WEBSOCKET_VERSION, "13")
+        .header(SEC_WEBSOCKET_KEY, key)
+        .header(SEC_WEBSOCKET_PROTOCOL, "binary")
+        .header(AUTHORIZATION, auth.clone())
+        .header(USER_AGENT, HeaderValue::from_static(crate::client::USER_AGENT))
+        .body(Empty::new())
+        // The error text never contains the URL (which carries the ticket).
+        .map_err(|e| Error::WebSocket(format!("cannot build the upgrade request: {e}")))
+}
+
+async fn upgrade(
+    transport: Transport,
+    request: Request<Empty<Bytes>>,
+    key: &str,
+    label: &str,
+) -> Result<VncStream, Error> {
+    let network =
+        |e: &(dyn std::error::Error + 'static)| Error::Network { host: label.to_owned(), detail: error_chain(e) };
+    let handshake = async {
+        // Title-case header names on the wire, as browsers (and tungstenite before) send them.
+        let (mut sender, connection) = hyper::client::conn::http1::Builder::new()
+            .title_case_headers(true)
+            .handshake(TokioIo::new(transport))
+            .await
+            .map_err(|e| network(&e))?;
+        // Drives the connection until the 101 hands the socket over to `hyper::upgrade::on`.
+        tokio::spawn(async move {
+            if let Err(e) = connection.with_upgrades().await {
+                tracing::debug!(error = %e, "console upgrade connection ended");
+            }
+        });
+        let response = sender.send_request(request).await.map_err(|e| network(&e))?;
+        if response.status() != StatusCode::SWITCHING_PROTOCOLS {
+            let status = response.status();
+            let body = Limited::new(response.into_body(), MAX_ERROR_BODY).collect().await;
+            return Err(upgrade_refused(status, &body.map(|b| b.to_bytes()).unwrap_or_default()));
         }
+        check_switch(response.headers(), key)?;
+        hyper::upgrade::on(response).await.map_err(|e| network(&e))
     };
-    let tcp = tokio::time::timeout(TCP_CONNECT_TIMEOUT, connecting)
+    let upgraded = tokio::time::timeout(UPGRADE_TIMEOUT, handshake)
         .await
-        .map_err(|_| network("TCP connect timed out".to_owned()))?
-        .map_err(|e| network(error_chain(&e)))?;
-    tcp.set_nodelay(true).map_err(|e| network(error_chain(&e)))?;
-    Ok(tcp)
-}
-
-async fn tls_handshake(
-    tcp: TcpStream,
-    host: &Host<String>,
-    target: &Target<'_>,
-) -> Result<tokio_rustls::client::TlsStream<TcpStream>, Error> {
-    let network = |detail: String| Error::Network { host: target.host.to_owned(), detail };
-    let server_name = match host {
-        Host::Domain(domain) => ServerName::try_from(domain.clone())
-            .map_err(|e| Error::Config(format!("invalid host name {domain:?}: {e}")))?,
-        Host::Ipv4(ip) => ServerName::IpAddress(IpAddr::V4(*ip).into()),
-        Host::Ipv6(ip) => ServerName::IpAddress(IpAddr::V6(*ip).into()),
-    };
-    let connector = tokio_rustls::TlsConnector::from(target.tls.config.clone());
-    match tokio::time::timeout(TLS_HANDSHAKE_TIMEOUT, connector.connect(server_name, tcp)).await {
-        Err(_) => Err(network("TLS handshake timed out".to_owned())),
-        Ok(Ok(stream)) => Ok(stream),
-        Ok(Err(e)) => Err(match target.tls.rejection_for(&e) {
-            Some(problem) => Error::UntrustedCert(problem),
-            None => network(error_chain(&e)),
-        }),
-    }
-}
-
-async fn upgrade<S>(stream: S, request: Request, label: &str) -> Result<VncStream, Error>
-where
-    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
-{
-    // Write every message right away: console traffic is small and latency sensitive.
-    let config = WebSocketConfig::default().write_buffer_size(0);
-    let handshake = tokio_tungstenite::client_async_with_config(request, stream, Some(config));
-    let (ws, _response) = tokio::time::timeout(UPGRADE_TIMEOUT, handshake)
-        .await
-        .map_err(|_| Error::WebSocket("the websocket handshake timed out".to_owned()))?
-        .map_err(|e| upgrade_error(e, label))?;
+        .map_err(|_| Error::WebSocket("the websocket handshake timed out".to_owned()))??;
     tracing::debug!("console websocket open");
+    let ws = tokio_websockets::ClientBuilder::new().take_over(TokioIo::new(upgraded));
     Ok(VncStream { inner: Box::pin(WsBytes::new(ws)) })
 }
 
-fn upgrade_error(err: tungstenite::Error, label: &str) -> Error {
-    match err {
-        tungstenite::Error::Http(response) => {
-            let status = response.status();
-            let body = response.body().as_deref().unwrap_or_default();
-            let message = api::error_message(body, status.canonical_reason().unwrap_or_default());
-            Error::Api { status: status.as_u16(), message }
-        }
-        tungstenite::Error::Io(e) => Error::Network { host: label.to_owned(), detail: error_chain(&e) },
-        other => Error::WebSocket(other.to_string()),
+/// A non-101 answer to the upgrade: the message from the JSON body, else the status text.
+fn upgrade_refused(status: StatusCode, body: &[u8]) -> Error {
+    let message = api::error_message(body, status.canonical_reason().unwrap_or_default());
+    Error::Api { status: status.as_u16(), message }
+}
+
+/// RFC 6455 4.1: the 101 must upgrade to `websocket`, prove it read our key, and pick the
+/// `binary` sub-protocol we asked for.
+fn check_switch(headers: &HeaderMap, key: &str) -> Result<(), Error> {
+    let header = |name| headers.get(name).and_then(|v: &HeaderValue| v.to_str().ok()).unwrap_or_default();
+    let fail = |what: &str| Err(Error::WebSocket(format!("invalid upgrade response: {what}")));
+    if !header(UPGRADE).eq_ignore_ascii_case("websocket") {
+        return fail("no Upgrade: websocket");
     }
+    if !header(CONNECTION).split(',').any(|token| token.trim().eq_ignore_ascii_case("upgrade")) {
+        return fail("no Connection: Upgrade");
+    }
+    if header(SEC_WEBSOCKET_ACCEPT) != accept_key(key) {
+        return fail("wrong Sec-WebSocket-Accept");
+    }
+    if header(SEC_WEBSOCKET_PROTOCOL) != "binary" {
+        return fail("the server did not accept the binary sub-protocol");
+    }
+    Ok(())
 }
 
 /// Binary websocket messages as a byte stream.
 ///
 /// Reading: binary payloads are concatenated, text is ignored, ping/pong are skipped
-/// (tungstenite answers pings itself), a close frame or the end of the session is EOF.
+/// (tokio-websockets answers pings itself), a close frame or the end of the session is EOF.
 /// Writing: each `poll_write` becomes one binary message.
 struct WsBytes<S> {
     ws: WebSocketStream<S>,
@@ -209,27 +205,28 @@ impl<S> WsBytes<S> {
     }
 }
 
-fn to_io(err: tungstenite::Error) -> io::Error {
+type WsError = tokio_websockets::Error;
+
+fn to_io(err: WsError) -> io::Error {
     match err {
-        tungstenite::Error::Io(e) => e,
+        WsError::Io(e) => e,
         other => io::Error::other(other),
     }
 }
 
-fn is_closed(err: &tungstenite::Error) -> bool {
-    matches!(err, tungstenite::Error::ConnectionClosed | tungstenite::Error::AlreadyClosed)
+fn is_closed(err: &WsError) -> bool {
+    matches!(err, WsError::AlreadyClosed)
 }
 
 /// Whether a read error only means that the server ended the session.
 ///
 /// pveproxy never sends a websocket close frame: when the VNC backend goes away (VM stop /
 /// reboot, vncproxy exit, pveproxy restart) or after our own close it just shuts the socket
-/// down. tungstenite reports that as `ResetWithoutClosingHandshake` (TCP EOF without a close
-/// handshake), rustls as `UnexpectedEof` (TCP EOF without a TLS `close_notify`).
-fn is_end_of_session(err: &tungstenite::Error) -> bool {
+/// down. A plain TCP EOF ends the message stream (no error); rustls reports a TLS session
+/// without `close_notify` as `UnexpectedEof` (Secure Transport as a plain EOF).
+fn is_end_of_session(err: &WsError) -> bool {
     match err {
-        tungstenite::Error::Protocol(ProtocolError::ResetWithoutClosingHandshake) => true,
-        tungstenite::Error::Io(e) => e.kind() == io::ErrorKind::UnexpectedEof,
+        WsError::Io(e) => e.kind() == io::ErrorKind::UnexpectedEof,
         other => is_closed(other),
     }
 }
@@ -248,9 +245,10 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AsyncRead for WsBytes<S> {
                 return Poll::Ready(Ok(()));
             }
             match ready!(Pin::new(&mut this.ws).poll_next(cx)) {
-                Some(Ok(Message::Binary(data))) => this.pending = data,
-                Some(Ok(Message::Close(_))) | None => this.eof = true,
-                Some(Ok(Message::Text(_) | Message::Ping(_) | Message::Pong(_) | Message::Frame(_))) => {}
+                Some(Ok(message)) if message.is_binary() => this.pending = Bytes::from(message.into_payload()),
+                Some(Ok(message)) if message.is_close() => this.eof = true,
+                None => this.eof = true,
+                Some(Ok(_)) => {} // text, ping, pong
                 Some(Err(e)) if is_end_of_session(&e) => {
                     tracing::debug!(reason = %e, "console websocket ended");
                     this.eof = true;
@@ -269,7 +267,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AsyncWrite for WsBytes<S> {
         let mut ws = Pin::new(&mut self.ws);
         ready!(ws.as_mut().poll_ready(cx)).map_err(to_io)?;
         let chunk = &buf[..buf.len().min(MAX_WRITE_CHUNK)];
-        ws.start_send(Message::Binary(Bytes::copy_from_slice(chunk))).map_err(to_io)?;
+        ws.start_send(Message::binary(Bytes::copy_from_slice(chunk))).map_err(to_io)?;
         Poll::Ready(Ok(chunk.len()))
     }
 
@@ -287,6 +285,8 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AsyncWrite for WsBytes<S> {
 
 #[cfg(test)]
 mod tests {
+    use tokio_websockets::proto::ProtocolError;
+
     use super::*;
 
     #[test]
@@ -297,59 +297,99 @@ mod tests {
         .unwrap();
         let mut auth = HeaderValue::from_static("PVEAPIToken=root@pam!t=secret");
         auth.set_sensitive(true);
-        let request = upgrade_request(&url, true, &auth).unwrap();
+        let request = upgrade_request(&url, &auth, "dGhlIHNhbXBsZSBub25jZQ==").unwrap();
         assert_eq!(
             request.uri().to_string(),
-            "wss://pve:8006/api2/json/nodes/pve2/qemu/101/vncwebsocket?port=5900&vncticket=PVEVNC%3Aab%2Bc"
+            "/api2/json/nodes/pve2/qemu/101/vncwebsocket?port=5900&vncticket=PVEVNC%3Aab%2Bc"
         );
         let headers = request.headers();
+        assert_eq!(headers[HOST], "pve:8006");
         assert_eq!(headers[AUTHORIZATION], "PVEAPIToken=root@pam!t=secret");
         assert!(headers[AUTHORIZATION].is_sensitive());
         assert_eq!(headers[SEC_WEBSOCKET_PROTOCOL], "binary");
+        assert_eq!(headers[SEC_WEBSOCKET_KEY], "dGhlIHNhbXBsZSBub25jZQ==");
+        assert_eq!(
+            (&headers[UPGRADE], &headers[CONNECTION], &headers[SEC_WEBSOCKET_VERSION]),
+            (
+                &HeaderValue::from_static("websocket"),
+                &HeaderValue::from_static("Upgrade"),
+                &HeaderValue::from_static("13")
+            )
+        );
         assert!(headers[USER_AGENT].to_str().unwrap().starts_with("vmherd/"));
-        let plain = upgrade_request(&Url::parse("http://127.0.0.1:18006/x").unwrap(), false, &auth).unwrap();
-        assert_eq!(plain.uri().scheme_str(), Some("ws"));
+        let default_port = upgrade_request(&Url::parse("https://[fd00::1]/x").unwrap(), &auth, "k").unwrap();
+        assert_eq!(default_port.headers()[HOST], "[fd00::1]");
+    }
+
+    #[test]
+    fn keys_are_random_and_accepted_per_rfc() {
+        // RFC 6455, section 1.3.
+        assert_eq!(accept_key("dGhlIHNhbXBsZSBub25jZQ=="), "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
+        let (a, b) = (new_key().unwrap(), new_key().unwrap());
+        assert_ne!(a, b);
+        assert_eq!(BASE64.decode(&a).unwrap().len(), 16);
+    }
+
+    #[test]
+    fn switch_response_is_checked() {
+        let key = "dGhlIHNhbXBsZSBub25jZQ==";
+        let good = [
+            (UPGRADE, "WebSocket"),
+            (CONNECTION, "keep-alive, Upgrade"),
+            (SEC_WEBSOCKET_ACCEPT, "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="),
+            (SEC_WEBSOCKET_PROTOCOL, "binary"),
+        ];
+        let headers = |skip: Option<usize>, accept: &'static str| {
+            let mut map = HeaderMap::new();
+            for (i, (name, value)) in good.iter().enumerate() {
+                if Some(i) != skip {
+                    let value = if *name == SEC_WEBSOCKET_ACCEPT { accept } else { value };
+                    map.insert(name.clone(), HeaderValue::from_static(value));
+                }
+            }
+            map
+        };
+        assert!(check_switch(&headers(None, good[2].1), key).is_ok());
+        for skip in 0..good.len() {
+            assert!(matches!(check_switch(&headers(Some(skip), good[2].1), key), Err(Error::WebSocket(_))), "{skip}");
+        }
+        assert!(check_switch(&headers(None, "AAAAAAAAAAAAAAAAAAAAAAAAAAA="), key).is_err());
     }
 
     #[test]
     fn http_upgrade_failure_maps_to_api_error() {
-        let response = tungstenite::http::Response::builder()
-            .status(401)
-            .body(Some(br#"{"data":null,"message":"permission denied - invalid PVE ticket\n"}"#.to_vec()))
-            .unwrap();
-        match upgrade_error(tungstenite::Error::Http(Box::new(response)), "pve:8006") {
+        let body = br#"{"data":null,"message":"permission denied - invalid PVE ticket\n"}"#;
+        match upgrade_refused(StatusCode::UNAUTHORIZED, body) {
             Error::Api { status, message } => {
                 assert_eq!(status, 401);
                 assert_eq!(message, "permission denied - invalid PVE ticket");
             }
             other => panic!("unexpected {other:?}"),
         }
-        let empty = tungstenite::http::Response::builder().status(403).body(None).unwrap();
         assert!(matches!(
-            upgrade_error(tungstenite::Error::Http(Box::new(empty)), "pve:8006"),
+            upgrade_refused(StatusCode::FORBIDDEN, b""),
             Error::Api { status: 403, message } if message == "Forbidden"
         ));
     }
 
     #[test]
     fn socket_shutdown_ends_the_session() {
-        let reset = tungstenite::Error::Protocol(ProtocolError::ResetWithoutClosingHandshake);
-        let tls_eof = tungstenite::Error::Io(io::Error::new(
+        let tls_eof = WsError::Io(io::Error::new(
             io::ErrorKind::UnexpectedEof,
             "peer closed connection without sending TLS close_notify",
         ));
-        for err in [reset, tls_eof, tungstenite::Error::ConnectionClosed] {
+        for err in [tls_eof, WsError::AlreadyClosed] {
             assert!(is_end_of_session(&err), "{err}");
         }
-        let reset = tungstenite::Error::Io(io::ErrorKind::ConnectionReset.into());
+        let reset = WsError::Io(io::ErrorKind::ConnectionReset.into());
         assert!(!is_end_of_session(&reset), "a reset stays an error");
-        let bad = tungstenite::Error::Protocol(ProtocolError::ReceivedAfterClosing);
+        let bad = WsError::Protocol(ProtocolError::InvalidOpcode);
         assert!(!is_end_of_session(&bad));
     }
 
     #[test]
     fn trace_logs_are_compiled_out() {
-        // tungstenite trace-logs the upgrade request (token, ticket) and frame payloads.
+        // A safeguard: no dependency may trace-log the upgrade request (token, ticket) or frames.
         assert!(log::STATIC_MAX_LEVEL <= log::LevelFilter::Debug);
     }
 }
