@@ -1,6 +1,7 @@
 //! Application state and the frame loop.
 
 use std::collections::{BTreeMap, HashMap};
+#[cfg(not(feature = "mas"))]
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -46,6 +47,8 @@ const ESC_HOLD: Duration = Duration::from_secs(1);
 pub struct Startup {
     pub cluster: Option<String>,
     pub vmids: Vec<u32>,
+    /// `--screenshot FILE` after this many seconds (not in the Mac App Store build).
+    #[cfg(not(feature = "mas"))]
     pub screenshot: Option<(PathBuf, f64)>,
     /// Start in the demo cluster; settings are neither loaded nor saved.
     pub demo: bool,
@@ -133,6 +136,7 @@ struct Trust {
     problem: pve::CertProblem,
 }
 
+#[cfg(not(feature = "mas"))]
 struct Screenshot {
     path: PathBuf,
     at: f64,
@@ -168,6 +172,7 @@ pub struct App {
     trust: Option<Trust>,
     /// VMIDs from the command line, for this bookmark only
     startup_grid: Option<(Uuid, Vec<u32>)>,
+    #[cfg(not(feature = "mas"))]
     screenshot: Option<Screenshot>,
     /// false after `--demo`: nothing is read from or written to the settings file
     persist: bool,
@@ -213,6 +218,7 @@ impl App {
             confirm: None,
             trust: None,
             startup_grid: None,
+            #[cfg(not(feature = "mas"))]
             screenshot: startup.screenshot.map(|(path, at)| Screenshot { path, at, requested: false }),
             persist: !startup.demo,
             stash: None,
@@ -1343,6 +1349,7 @@ impl App {
         }
     }
 
+    #[cfg(not(feature = "mas"))]
     fn handle_screenshot(&mut self, ctx: &egui::Context) {
         let Some(shot) = &mut self.screenshot else { return };
         let now = ctx.input(|i| i.time);
@@ -1571,6 +1578,7 @@ impl eframe::App for App {
         self.toasts.ui(&ctx, content.right(), bottom);
         #[cfg(feature = "store-shots")]
         self.drive_scene(&ctx);
+        #[cfg(not(feature = "mas"))]
         self.handle_screenshot(&ctx);
     }
 

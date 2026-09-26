@@ -5,11 +5,18 @@
 //! * macOS: an existing Keychain item (read with the `security` tool);
 //! * any platform: a command that prints the secret (`pass`, `secret-tool`, `op`, `bw`, ...);
 //! * Linux fallback: a private file (mode 600) in the config directory, not encrypted.
+//!
+//! The Mac App Store build (feature `mas`) runs in the App Sandbox and starts no other programs:
+//! it has only the Keychain store. The Keychain-item and command sources are compiled out; old
+//! bookmarks that use them still load and get an explanation instead of a secret.
 
+#[cfg(not(feature = "mas"))]
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
+#[cfg(not(feature = "mas"))]
 use std::process::{Command, Stdio};
 use std::sync::LazyLock;
+#[cfg(not(feature = "mas"))]
 use std::time::{Duration, Instant};
 
 use uuid::Uuid;
@@ -18,7 +25,17 @@ use crate::config::{Bookmark, Config, SecretSource};
 
 const SERVICE: &str = "VMherd";
 /// Password managers may show an unlock prompt first.
+#[cfg(not(feature = "mas"))]
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// Whether this build can read a secret from outside VMherd (an existing Keychain item, a
+/// command). The Mac App Store build cannot: the App Sandbox build starts no other programs.
+pub const EXTERNAL_SOURCES: bool = !cfg!(feature = "mas");
+
+/// Why a bookmark with a Keychain-item or command source gets no secret in the Mac App Store build.
+#[cfg(feature = "mas")]
+pub const NOT_IN_MAS: &str = "Reading the token secret from a Keychain item or a command is not available in the Mac \
+                              App Store version; edit the cluster and save the token secret in the Keychain";
 
 /// The name users know for the place where VMherd saves token secrets.
 pub const STORE_NAME: &str = if cfg!(target_os = "macos") {
@@ -72,8 +89,12 @@ pub fn get(bookmark: &Bookmark) -> Result<String, String> {
             )),
             Err(e) => Err(format!("{STORE_NAME}: {e}")),
         },
+        #[cfg(not(feature = "mas"))]
         SecretSource::MacKeychain { service, account } => mac_keychain(service, account.as_deref()),
+        #[cfg(not(feature = "mas"))]
         SecretSource::Command { command } => run_command(command, COMMAND_TIMEOUT),
+        #[cfg(feature = "mas")]
+        SecretSource::MacKeychain { .. } | SecretSource::Command { .. } => Err(NOT_IN_MAS.into()),
         SecretSource::File => read_file(&file_path(bookmark.id)?),
     }
 }
@@ -174,9 +195,10 @@ fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     std::fs::write(path, bytes)
 }
 
-// ---------- command ----------
+// ---------- command (not in the Mac App Store build) ----------
 
 /// Run `command` through the shell; the first line it prints is the secret.
+#[cfg(not(feature = "mas"))]
 fn run_command(command: &str, timeout: Duration) -> Result<String, String> {
     #[cfg(unix)]
     let mut cmd = {
@@ -231,9 +253,9 @@ fn run_command(command: &str, timeout: Duration) -> Result<String, String> {
     }
 }
 
-// ---------- macOS Keychain item ----------
+// ---------- macOS Keychain item (not in the Mac App Store build) ----------
 
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", not(feature = "mas")))]
 fn mac_keychain(service: &str, account: Option<&str>) -> Result<String, String> {
     let mut cmd = Command::new("/usr/bin/security");
     cmd.args(["find-generic-password", "-s", service]);
@@ -249,7 +271,7 @@ fn mac_keychain(service: &str, account: Option<&str>) -> Result<String, String> 
     if secret.is_empty() { Err(format!("Keychain item \"{service}\" is empty")) } else { Ok(secret) }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(not(target_os = "macos"), not(feature = "mas")))]
 fn mac_keychain(_service: &str, _account: Option<&str>) -> Result<String, String> {
     Err("Keychain items are only available on macOS".into())
 }
@@ -258,7 +280,7 @@ fn mac_keychain(_service: &str, _account: Option<&str>) -> Result<String, String
 mod tests {
     use super::*;
 
-    #[cfg(unix)]
+    #[cfg(all(unix, not(feature = "mas")))]
     #[test]
     fn command_source() {
         let t = Duration::from_secs(5);
@@ -294,6 +316,26 @@ mod tests {
         assert_eq!(get(&b).unwrap(), "pw-123");
         delete(id, &SecretSource::Keyring).unwrap();
         assert!(get(&b).unwrap_err().contains("No token secret"));
+    }
+
+    /// Mac App Store build: old bookmarks with a Keychain-item or command source load, run nothing
+    /// and explain what to do.
+    #[cfg(feature = "mas")]
+    #[test]
+    fn mas_has_no_external_sources() {
+        let mut b = Bookmark {
+            id: Uuid::new_v4(),
+            name: "old".into(),
+            url: "https://pve.example.com:8006".into(),
+            token_id: "user@pve!vmherd".into(),
+            secret: SecretSource::Command { command: "echo s3cret".into() },
+            pinned_sha256: None,
+            grid: Vec::new(),
+            nosync: Vec::new(),
+        };
+        assert_eq!(get(&b).unwrap_err(), NOT_IN_MAS);
+        b.secret = SecretSource::MacKeychain { service: "vmherd-token".into(), account: None };
+        assert_eq!(get(&b).unwrap_err(), NOT_IN_MAS);
     }
 
     /// Linux without a Secret Service: the store is reported unavailable, nothing panics, and the

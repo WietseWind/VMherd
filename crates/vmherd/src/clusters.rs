@@ -106,6 +106,18 @@ impl Form {
                 Source::Command
             }
         };
+        // Mac App Store build: those sources are gone; offer the Keychain instead and say why
+        let (source, error) = match source {
+            Source::MacKeychain | Source::Command if !secrets::EXTERNAL_SOURCES => (
+                Source::Keyring,
+                Some(format!(
+                    "Reading the token secret from a Keychain item or a command is not available in the Mac App \
+                     Store version. Enter the token secret to save it in the {}.",
+                    secrets::STORE_NAME
+                )),
+            ),
+            s => (s, None),
+        };
         Self {
             id: Some(b.id),
             name: b.name.clone(),
@@ -118,7 +130,7 @@ impl Form {
             command,
             pinned: b.pinned_sha256.clone(),
             forget_pin: false,
-            error: None,
+            error,
         }
     }
 
@@ -150,6 +162,9 @@ impl Form {
                 }
                 let source = if self.source == Source::Keyring { SecretSource::Keyring } else { SecretSource::File };
                 (source, (!secret.is_empty()).then(|| secret.to_owned()))
+            }
+            Source::MacKeychain | Source::Command if !secrets::EXTERNAL_SOURCES => {
+                return Err(format!("Save the token secret in the {}.", secrets::STORE_NAME));
             }
             Source::Command => {
                 let command = self.command.trim();
@@ -492,11 +507,13 @@ impl ClustersUi {
                     )
                     .on_disabled_hover_text(store.as_ref().err().cloned().unwrap_or_default());
                 });
-                if cfg!(target_os = "macos") {
+                if cfg!(target_os = "macos") && secrets::EXTERNAL_SOURCES {
                     ui.radio_value(&mut form.source, Source::MacKeychain, "Use an existing Keychain item");
                 }
-                ui.radio_value(&mut form.source, Source::Command, "Get it from a command")
-                    .on_hover_text("For password managers: pass, secret-tool, op, bw, keepassxc-cli, ...");
+                if secrets::EXTERNAL_SOURCES {
+                    ui.radio_value(&mut form.source, Source::Command, "Get it from a command")
+                        .on_hover_text("For password managers: pass, secret-tool, op, bw, keepassxc-cli, ...");
+                }
                 if cfg!(all(unix, not(target_os = "macos"))) {
                     ui.radio_value(&mut form.source, Source::File, "Save it in a private file (not encrypted)")
                         .on_hover_text("A file only your user can read, in VMherd's config folder");

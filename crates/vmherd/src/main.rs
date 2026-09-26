@@ -1,6 +1,10 @@
 //! VMherd: many Proxmox VM consoles in one window, one keyboard for all of them.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+// Scripted screenshots write files anywhere and are for development; the App Store build has none.
+#[cfg(all(feature = "mas", feature = "store-shots"))]
+compile_error!("the features \"mas\" (Mac App Store build) and \"store-shots\" cannot be combined");
+
 mod app;
 mod backend;
 mod bar;
@@ -18,12 +22,14 @@ mod toast;
 mod typing;
 mod widgets;
 
+#[cfg(not(feature = "mas"))]
 use std::path::PathBuf;
 
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
+#[cfg_attr(feature = "mas", derive(Default))]
 #[command(
     name = "vmherd",
     version,
@@ -41,8 +47,10 @@ struct Args {
     /// VMIDs to put in the grid (of --cluster, --demo, else the last used cluster).
     vmids: Vec<u32>,
     /// Save a PNG of the window after --screenshot-after seconds, then quit (docs / tests).
+    #[cfg(not(feature = "mas"))]
     #[arg(long, hide = true)]
     screenshot: Option<PathBuf>,
+    #[cfg(not(feature = "mas"))]
     #[arg(long, hide = true, default_value_t = 8.0)]
     screenshot_after: f64,
     /// Drive the demo into a store screenshot scene, save it to --out, then quit.
@@ -60,11 +68,12 @@ fn main() -> eframe::Result {
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn,vmherd=info")))
         .with_writer(std::io::stderr)
         .init();
-    let args = Args::parse();
+    let args = parse_args();
     let demo = args.demo;
     let startup = app::Startup {
         cluster: args.cluster,
         vmids: args.vmids,
+        #[cfg(not(feature = "mas"))]
         screenshot: args.screenshot.map(|p| (p, args.screenshot_after)),
         demo: args.demo,
         #[cfg(feature = "store-shots")]
@@ -85,6 +94,26 @@ fn main() -> eframe::Result {
         options.persistence_path = Some(std::env::temp_dir().join("vmherd-demo-unsaved.ron"));
     }
     eframe::run_native("vmherd", options, Box::new(move |cc| Ok(Box::new(app::App::new(cc, startup)?))))
+}
+
+#[cfg(not(feature = "mas"))]
+fn parse_args() -> Args {
+    Args::parse()
+}
+
+/// Mac App Store build: an unexpected launch argument (the system or a tool may add some) is
+/// ignored instead of ending the app; only an explicit --help / --version prints and exits.
+#[cfg(feature = "mas")]
+fn parse_args() -> Args {
+    use clap::error::ErrorKind;
+    match Args::try_parse() {
+        Ok(args) => args,
+        Err(e) if matches!(e.kind(), ErrorKind::DisplayHelp | ErrorKind::DisplayVersion) => e.exit(),
+        Err(e) => {
+            tracing::warn!("ignoring the command line: {}", e.kind());
+            Args::default()
+        }
+    }
 }
 
 /// The window / Dock icon (assets/icon, generated from vmherd-prompt.svg).

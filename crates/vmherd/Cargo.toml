@@ -18,6 +18,10 @@ path = "src/main.rs"
 workspace = true
 
 [features]
+# Mac App Store build (tools/package-mas.sh): App Sandbox, no child processes, so only the Keychain
+# for token secrets (no "existing Keychain item" or "command" source), no --screenshot, launch
+# arguments never exit the app, and the App Store license text in About.
+mas = []
 # `--scene NAME --out FILE`: scripted App Store screenshots of the demo. Development only: release
 # and App Store builds never enable it.
 store-shots = []
