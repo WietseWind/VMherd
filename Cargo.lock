@@ -3553,8 +3553,10 @@ dependencies = [
 name = "rfb"
 version = "0.1.0"
 dependencies = [
+ "core-foundation 0.10.1",
  "des",
  "flate2",
+ "security-framework",
  "thiserror 2.0.21",
  "tokio",
  "tracing",

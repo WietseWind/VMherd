@@ -160,7 +160,7 @@ where
             let password = config.password.as_deref().ok_or(Error::PasswordRequired)?;
             let mut challenge = [0u8; 16];
             reader.read_exact(&mut challenge).await?;
-            wire::send(writer, &vnc_auth_response(password, &challenge)).await?;
+            wire::send(writer, &vnc_auth_response(password, &challenge)?).await?;
             security_result(reader, version).await
         }
         // Before 3.8 there is no SecurityResult after "None".

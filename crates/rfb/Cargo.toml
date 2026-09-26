@@ -12,10 +12,22 @@ workspace = true
 
 [dependencies]
 tokio.workspace = true
-des.workspace = true
 flate2.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 
+# VNC Authentication's DES: the operating system's on macOS (no cipher shipped in the app),
+# the pure-Rust `des` crate elsewhere.
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework.workspace = true
+core-foundation.workspace = true
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+des.workspace = true
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
+
+# the tests cross-check the system's DES against the `des` crate
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+des.workspace = true
