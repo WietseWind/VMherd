@@ -8,11 +8,15 @@
   <key>CFBundleExecutable</key><string>vmherd</string>
   <key>CFBundleIconFile</key><string>vmherd</string>
   <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleSupportedPlatforms</key><array><string>MacOSX</string></array>
   <key>CFBundleShortVersionString</key><string>__VERSION__</string>
-  <key>CFBundleVersion</key><string>__VERSION__</string>
+  <key>CFBundleVersion</key><string>__BUILD__</string>
   <key>LSMinimumSystemVersion</key><string>11.0</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSLocalNetworkUsageDescription</key><string>VMherd connects to the Proxmox VE servers you add, which are often on your local network.</string>
   <key>NSHumanReadableCopyright</key><string>© 2026 The Integrators BV (NL), Wietse Wind</string>
 </dict>
 </plist>
