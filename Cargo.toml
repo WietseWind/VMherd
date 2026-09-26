@@ -56,3 +56,8 @@ all = { level = "warn", priority = -1 }
 lto = "thin"
 codegen-units = 1
 strip = true
+
+# winit 0.30.13 with its private macOS APIs removed (Mac App Store guideline 2.5.1); see
+# vendor/winit-0.30.13/VENDORED.md. Drop this once eframe uses a winit without them.
+[patch.crates-io]
+winit = { path = "vendor/winit-0.30.13" }
