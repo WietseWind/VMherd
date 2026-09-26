@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/rfb", "crates/pve", "crates/demo", "crates/vmherd"]
 
 [workspace.package]
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 license = "PolyForm-Noncommercial-1.0.0"
 authors = ["The Integrators BV (NL), Wietse Wind"]
