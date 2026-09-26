@@ -214,6 +214,19 @@ fn poll_send(tcp: &mut TcpStream, buffers: &mut Buffers, cx: &mut Context<'_>) -
     Poll::Ready(Ok(()))
 }
 
+/// Writes what the socket takes right now, without waiting and without registering a waker.
+fn try_send(tcp: &TcpStream, buffers: &mut Buffers) -> io::Result<()> {
+    while !buffers.outgoing.is_empty() {
+        match tcp.try_write(&buffers.outgoing) {
+            Ok(0) => return Err(io::ErrorKind::WriteZero.into()),
+            Ok(n) => buffers.outgoing.advance(n),
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => break,
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(())
+}
+
 /// Reads the next chunk from the socket into the buffers (or notes end of file).
 fn poll_receive(tcp: &mut TcpStream, buffers: &mut Buffers, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
     let mut chunk = [0u8; READ_CHUNK];
@@ -243,13 +256,11 @@ impl AsyncRead for TlsStream {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
         let this = self.get_mut();
         loop {
-            // Records Secure Transport produced while reading (alerts) go out first. Only then:
-            // this may run on another task than the writer, whose socket waker it replaces.
-            if !this.ssl.get_ref().outgoing.is_empty()
-                && let Poll::Ready(Err(e)) = poll_send(&mut this.tcp, this.ssl.get_mut(), cx)
-            {
-                return Poll::Ready(Err(e));
-            }
+            // Queued records (alerts, or a writer's backlog) go out if the socket takes them now.
+            // Never wait for that here: the reader may run on another task than the writer, and
+            // registering its waker for writability would replace the writer's, which then never
+            // wakes. The writer's own `poll_write` / `poll_flush` waits for the socket.
+            try_send(&this.tcp, this.ssl.get_mut())?;
             let room = buf.remaining().min(READ_CHUNK);
             match this.ssl.read(buf.initialize_unfilled_to(room)) {
                 // 0 is end of file: `close_notify`, or the socket closed without one (which
@@ -291,6 +302,7 @@ impl AsyncWrite for TlsStream {
         if !this.closing {
             this.closing = true;
             // Fails only if the session is already closed; the socket is shut down either way.
+            // Unlike rustls this is no half close: reads return EOF from here on.
             if let Err(e) = this.ssl.close() {
                 tracing::debug!(error = %e, "TLS close_notify not sent");
             }
@@ -426,6 +438,43 @@ mod tests {
             connect(&other, port, Host::Domain("localhost".to_owned())).await,
             Err(Error::UntrustedCert(CertProblem { changed: true, .. }))
         ));
+    }
+
+    /// Megabytes each way with the reader and the writer on different tasks: backpressure on
+    /// the socket must not lose either side's wakeup.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn bulk_data_with_reader_and_writer_on_separate_tasks() {
+        const LEN: usize = 8 * 1024 * 1024;
+        let pki = new_pki(&["localhost"]);
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = pki.server.clone();
+        tokio::spawn(async move {
+            let (tcp, _) = listener.accept().await.unwrap();
+            let tls = TlsAcceptor::from(server).accept(tcp).await.unwrap();
+            let (mut read, mut write) = tokio::io::split(tls);
+            // Ends with an error when the client goes away.
+            let _ = tokio::io::copy(&mut read, &mut write).await;
+        });
+        let stream = connect(&trusting(&pki), port, Host::Domain("localhost".to_owned())).await.unwrap();
+        let (mut read, mut write) = tokio::io::split(stream);
+        let data: Vec<u8> = (0..LEN).map(|i| (i % 251) as u8).collect();
+        let expected = data.clone();
+        let writer = tokio::spawn(async move {
+            for chunk in data.chunks(10_000) {
+                write.write_all(chunk).await.unwrap();
+            }
+            write.flush().await.unwrap();
+            write
+        });
+        let reader = tokio::spawn(async move {
+            let mut back = vec![0; LEN];
+            read.read_exact(&mut back).await.unwrap();
+            back
+        });
+        let both = async { (writer.await.unwrap(), reader.await.unwrap()) };
+        let (_write, back) = tokio::time::timeout(std::time::Duration::from_secs(30), both).await.expect("stalled");
+        assert!(back == expected, "the echo differs");
     }
 
     #[test]
