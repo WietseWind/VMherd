@@ -133,7 +133,7 @@ mod tests {
                     vmid,
                     Console::open(
                         &rt,
-                        client.clone(),
+                        crate::backend::Backend::Pve(client.clone()),
                         pve::VmRef { vmid, node: "pve1".into(), kind: pve::VmKind::Qemu },
                         ctx.clone(),
                     ),
@@ -168,6 +168,60 @@ mod tests {
         for (vmid, _) in &consoles {
             let typed = body["typed"][vmid.to_string()].as_str().unwrap_or_default();
             assert!(typed.ends_with(&text), "VM {vmid} received {typed:?}");
+        }
+    }
+
+    /// The same pipeline against the built-in demo cluster (no Python, no network): RFB with QEMU
+    /// extended key events into two simulated VMs, whose shells echo and run what was typed.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn types_into_demo_consoles() {
+        use crate::backend::Backend;
+        use crate::console::{ConnState, Console};
+
+        let backend = Backend::demo().unwrap();
+        let Backend::Demo(cluster) = &backend else { unreachable!() };
+        let ctx = egui::Context::default();
+        let rt = tokio::runtime::Handle::current();
+        let consoles: Vec<(u32, Console)> = [(101, "pve1"), (102, "pve2")]
+            .into_iter()
+            .map(|(vmid, node)| {
+                let vm = pve::VmRef { vmid, node: node.into(), kind: pve::VmKind::Qemu };
+                (vmid, Console::open(&rt, backend.clone(), vm, ctx.clone()))
+            })
+            .collect();
+        for _ in 0..100 {
+            if consoles.iter().all(|(_, c)| c.state() == ConnState::Live) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        assert!(consoles.iter().all(|(_, c)| c.state() == ConnState::Live), "consoles did not connect");
+        tokio::time::sleep(Duration::from_millis(200)).await; // the extended key announcement
+
+        let marker = format!("e2e-{}", std::process::id());
+        let text = format!("echo {marker} \"Q|~\" ${{HOME}}/{{a,b}}; 1+1=2\n");
+        let (strokes, skipped) = crate::keys::text_strokes(&text);
+        assert_eq!(skipped, 0);
+        let jobs = consoles.iter().map(|(_, c)| (c.sender(), strokes.clone())).collect();
+        let typing = Typing::start(&rt, jobs, Duration::from_millis(2), ctx);
+        while !typing.is_finished() {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert_eq!(typing.progress(), (strokes.len(), strokes.len()));
+        for (vmid, name) in [(101, "web-01"), (102, "web-02")] {
+            let want = format!(
+                "root@{name}:~# {}\n{marker} Q|~ ${{HOME}}/{{a,b}}\n-bash: 1+1=2: command not found\nroot@{name}:~#",
+                text.trim_end()
+            );
+            let mut screen = String::new();
+            for _ in 0..100 {
+                screen = cluster.screen_text(vmid).unwrap();
+                if screen.ends_with(&want) {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+            assert!(screen.ends_with(&want), "VM {vmid} shows\n{screen}");
         }
     }
 

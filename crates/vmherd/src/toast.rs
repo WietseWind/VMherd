@@ -26,6 +26,11 @@ impl Toasts {
         self.push(text.into(), true, Duration::from_secs(10));
     }
 
+    #[cfg(feature = "store-shots")]
+    pub fn clear(&mut self) {
+        self.list.clear();
+    }
+
     fn push(&mut self, text: String, err: bool, ttl: Duration) {
         let text = crate::widgets::sentence(&text);
         tracing::info!(err, "{text}");

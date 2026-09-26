@@ -410,7 +410,7 @@ echo "<span class="ph">{{vmid}}</span> on <span class="ph">{{node}}</span>: <spa
         <p>Build it from source. Token secrets go to the Windows Credential Manager.</p>
       </article>
     </div>
-    <p class="soft platforms-note">Beta means built and tested on every commit, but used less day to day than the Mac app. Source and build instructions are on <a href="https://github.com/WietseWind/VMherd">GitHub</a>. Builds you make yourself fall under the source license: free for non-commercial use.</p>
+    <p class="soft platforms-note">Beta means built and tested automatically with every change to the main branch, but used less day to day than the Mac app. Source and build instructions are on <a href="https://github.com/WietseWind/VMherd">GitHub</a>. Builds you make yourself fall under the source license: free for non-commercial use.</p>
   </div>
 </section>
 
@@ -434,7 +434,7 @@ pveum acl modify /vms --users vmherd@pve --roles VMherd
 <span class="c"># the token inherits the user's permissions</span>
 pveum user token add vmherd@pve grid --privsep 0</code></pre>
       </div>
-      <p class="soft"><br>Leave out <code>VM.PowerMgmt</code> for a look-and-type-only token. Narrow <code>/vms</code> to a pool to limit which VMs VMherd can see.</p>
+      <p class="soft"><br>Leave out <code>VM.PowerMgmt</code> for a look-and-type-only token. To limit which VMs VMherd can see, grant the role on a pool (<code>/pool/<var>name</var></code>) instead of <code>/vms</code>.</p>
     </div>
     <div class="faq">
       <p class="eyebrow"><span class="n">??</span> FAQ</p>
@@ -445,7 +445,7 @@ pveum user token add vmherd@pve grid --privsep 0</code></pre>
       </details>
       <details>
         <summary>Which permissions does the token need?</summary>
-        <div><p><code>VM.Audit</code> to list VMs and <code>VM.Console</code> to open their consoles. Add <code>VM.PowerMgmt</code> if you want the start, shutdown and stop buttons. Grant them on <code>/vms</code>, or on a pool.</p></div>
+        <div><p><code>VM.Audit</code> to list VMs and <code>VM.Console</code> to open their consoles. Add <code>VM.PowerMgmt</code> if you want the start, shutdown and stop buttons. Grant them on <code>/vms</code>, or on a pool. For <code>{{ipv4}}</code> and <code>{{ipv6}}</code> of VMs (from the guest agent), add <code>VM.Monitor</code> on Proxmox VE 8 or <code>VM.GuestAgent.Audit</code> on Proxmox VE 9.</p></div>
       </details>
       <details>
         <summary>Does it send keys to other apps?</summary>
@@ -470,13 +470,13 @@ pveum user token add vmherd@pve grid --privsep 0</code></pre>
       <details>
         <summary>Does it run on Linux or Windows?</summary>
         <div>
-          <p>Yes, in beta. VMherd is written in Rust and the same code builds for Linux and Windows; CI builds and tests it on all three on every commit. There are no store builds for those yet: build it from the <a href="https://github.com/WietseWind/VMherd">source on GitHub</a>. On Linux, token secrets go to a Secret Service keyring; on Windows, to the Credential Manager.</p>
+          <p>Yes, in beta. VMherd is written in Rust and the same code builds for Linux and Windows; CI builds and tests it on all three with every change to the main branch. There are no store builds for those yet: build it from the <a href="https://github.com/WietseWind/VMherd">source on GitHub</a>. On Linux, token secrets go to a Secret Service keyring; on Windows, to the Credential Manager.</p>
         </div>
       </details>
       <details>
         <summary>Is the source code available? What is the license?</summary>
         <div>
-          <p>Yes. The source is on <a href="https://github.com/WietseWind/VMherd">GitHub</a>, source-available under the PolyForm Noncommercial License 1.0.0; it also builds for Linux and Windows.</p>
+          <p>Yes. The source is on <a href="https://github.com/WietseWind/VMherd">GitHub</a>, source-available under the PolyForm Noncommercial License 1.0.0.</p>
           <p>The Mac App Store version is licensed under Apple's standard license agreement, and covers use at home and at work. See <a href="license/">License</a>.</p>
         </div>
       </details>

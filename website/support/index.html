@@ -78,6 +78,7 @@
     <div class="term"><div class="term-head">On a Proxmox node</div>
 <pre><code>pveum acl modify /vms --tokens 'vmherd@pve!grid' --roles VMherd</code></pre></div>
     <p><br>The token ID in VMherd has the form <code>user@realm!tokenname</code>, for example <code>vmherd@pve!grid</code>.</p>
+    <p>If <code>{{ipv4}}</code> or <code>{{ipv6}}</code> types nothing for a VM: the QEMU guest agent must run in that VM, and the token needs <code>VM.Monitor</code> (Proxmox VE 8) or <code>VM.GuestAgent.Audit</code> (Proxmox VE 9). Containers need nothing extra.</p>
 
     <h3 id="unreachable">VMherd cannot reach the server</h3>
     <p>The API URL must be HTTPS, usually <code>https://pve.example.com:8006</code>. Check that your Mac can reach that address and port (VPN, firewall). Plain <code>http</code> is only accepted for <code>localhost</code>.</p>

@@ -17,9 +17,15 @@ path = "src/main.rs"
 [lints]
 workspace = true
 
+[features]
+# `--scene NAME --out FILE`: scripted App Store screenshots of the demo. Development only: release
+# and App Store builds never enable it.
+store-shots = []
+
 [dependencies]
 rfb.workspace = true
 pve.workspace = true
+demo.workspace = true
 eframe.workspace = true
 egui.workspace = true
 tokio.workspace = true

@@ -2,7 +2,7 @@
 
 use std::time::{Duration, Instant};
 
-use egui::{Align, Color32, Frame, Layout, Margin, RichText, ScrollArea, Stroke, TextEdit, Ui, vec2};
+use egui::{Align, Color32, Frame, Label, Layout, Margin, RichText, ScrollArea, Stroke, TextEdit, Ui, vec2};
 use uuid::Uuid;
 
 use crate::config::{Bookmark, Config, SecretSource};
@@ -12,6 +12,8 @@ use crate::widgets::{self, PlateStyle};
 
 pub enum ClusterAction {
     Connect(Uuid),
+    /// Open the built-in demo cluster.
+    Demo,
     /// `secret`: a new secret to save (None = keep the saved one). `forget_pin`: drop the pinned
     /// certificate. The app merges the edited fields into the bookmark and calls `finish_save`.
     Save {
@@ -216,6 +218,43 @@ fn card() -> Frame {
         .shadow(egui::Shadow { offset: [0, 6], blur: 18, spread: 0, color: Color32::from_black_alpha(100) })
 }
 
+/// First thing on an empty clusters screen: a way in without a Proxmox server. True = clicked.
+fn demo_card(ui: &mut Ui) -> bool {
+    let mut go = false;
+    card().stroke(Stroke::new(1.0, theme::GREEN_DARK)).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.set_max_width((ui.available_width() - 170.0).max(200.0));
+                ui.label(widgets::spaced("NO PROXMOX AT HAND?", theme::bold(11.0), theme::GREEN, 2.0));
+                ui.label(RichText::new("Try the demo cluster").font(theme::bold(18.0)).color(theme::TEXT));
+                ui.add(
+                    Label::new(
+                        RichText::new(
+                            "13 simulated VMs with live consoles, power buttons and a shell to type into. \
+                             It all runs inside VMherd: no server, no network, nothing saved.",
+                        )
+                        .font(theme::mono(12.0))
+                        .color(theme::MUTED),
+                    )
+                    .wrap(),
+                );
+            });
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                go = widgets::plate_button(
+                    ui,
+                    widgets::spaced("TRY THE DEMO", theme::bold(12.0), theme::INK, 1.6),
+                    vec2(140.0, 34.0),
+                    PlateStyle::GO,
+                    true,
+                )
+                .clicked();
+            });
+        });
+    });
+    go
+}
+
 fn field(ui: &mut Ui, label: &str, edit: TextEdit<'_>) -> egui::Response {
     ui.label(widgets::spaced(label, theme::label(11.0), theme::MUTED, 1.4));
     ui.add(edit.font(theme::mono(13.0)).desired_width(f32::INFINITY).margin(vec2(8.0, 6.0)))
@@ -269,29 +308,45 @@ impl ClustersUi {
                         ui.add_space(10.0);
                     }
                     if cfg.bookmarks.is_empty() && self.form.is_none() {
-                        ui.label(RichText::new("No clusters yet.").color(theme::DIM));
+                        if demo_card(ui) {
+                            action = Some(ClusterAction::Demo);
+                        }
                         ui.add_space(10.0);
                     }
                     if let Some(a) = self.form_ui(ui, cfg) {
                         action = Some(a);
                     } else if self.form.is_none() {
-                        let add = widgets::plate_button(
-                            ui,
-                            widgets::spaced("+ ADD CLUSTER", theme::bold(12.0), theme::TEXT, 1.6),
-                            vec2(150.0, 34.0),
-                            PlateStyle::DEFAULT,
-                            true,
-                        );
-                        if add.clicked() {
-                            self.form = Some(Form::new());
-                        }
+                        ui.horizontal(|ui| {
+                            let add = widgets::plate_button(
+                                ui,
+                                widgets::spaced("+ ADD CLUSTER", theme::bold(12.0), theme::TEXT, 1.6),
+                                vec2(150.0, 34.0),
+                                PlateStyle::DEFAULT,
+                                true,
+                            );
+                            if add.clicked() {
+                                self.form = Some(Form::new());
+                            }
+                            if !cfg.bookmarks.is_empty() {
+                                let demo = widgets::plate_button(
+                                    ui,
+                                    widgets::spaced("Try the demo", theme::label(12.0), theme::MUTED, 0.6),
+                                    vec2(0.0, 34.0),
+                                    PlateStyle::DEFAULT,
+                                    true,
+                                );
+                                if demo.on_hover_text("13 simulated VMs, no server or network needed").clicked() {
+                                    action = Some(ClusterAction::Demo);
+                                }
+                            }
+                        });
                     }
                     ui.add_space(24.0);
                     if let Some(path) = Config::path() {
                         ui.label(
                             RichText::new(format!(
                                 "Bookmarks are saved in {}. Token secrets never go into that file.",
-                                path.display(),
+                                crate::config::tilde(&path),
                             ))
                             .font(theme::mono(11.0))
                             .color(theme::DIM),

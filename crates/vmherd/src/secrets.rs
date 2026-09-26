@@ -142,7 +142,7 @@ fn read_file(path: &Path) -> Result<String, String> {
 
 fn write_file(path: &Path, secret: &str) -> Result<(), String> {
     let dir = path.parent().ok_or("Bad secret file path")?;
-    create_private_dir(dir).map_err(|e| format!("Cannot create {}: {e}", dir.display()))?;
+    create_private_dir(dir).map_err(|e| format!("Cannot create {}: {e}", crate::config::tilde(dir)))?;
     let tmp = path.with_extension("tmp");
     write_private(&tmp, secret.as_bytes()).map_err(|e| format!("Cannot write the secret file: {e}"))?;
     std::fs::rename(&tmp, path).map_err(|e| format!("Cannot write the secret file: {e}"))

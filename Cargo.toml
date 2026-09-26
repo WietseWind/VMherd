@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/rfb", "crates/pve", "crates/vmherd"]
+members = ["crates/rfb", "crates/pve", "crates/demo", "crates/vmherd"]
 
 [workspace.package]
 version = "0.1.0"
@@ -14,6 +14,7 @@ rust-version = "1.88"
 [workspace.dependencies]
 rfb = { path = "crates/rfb" }
 pve = { path = "crates/pve" }
+demo = { path = "crates/demo" }
 eframe = { version = "0.36", features = ["persistence"] }
 egui = "0.36"
 tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "time"] }

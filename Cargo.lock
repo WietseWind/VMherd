@@ -1048,6 +1048,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4583a4551df46e2792f82ceeac45e850d2e2d5debba0b91f102385cda5b11f06"
 
 [[package]]
+name = "demo"
+version = "0.1.0"
+dependencies = [
+ "rfb",
+ "skrifa",
+ "tokio",
+ "vello_cpu",
+]
+
+[[package]]
 name = "der-parser"
 version = "10.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4727,6 +4737,7 @@ dependencies = [
  "anyhow",
  "apple-native-keyring-store",
  "clap",
+ "demo",
  "directories",
  "eframe",
  "egui",

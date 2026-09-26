@@ -1,0 +1,15 @@
+# The demo cluster must never open a socket or run a program.
+# (tokio entries may be unreachable when the demo is built without the rest of the workspace)
+disallowed-types = [
+    { path = "std::net::TcpStream", reason = "the demo is network-free" },
+    { path = "std::net::TcpListener", reason = "the demo is network-free" },
+    { path = "std::net::UdpSocket", reason = "the demo is network-free" },
+    { path = "tokio::net::TcpStream", reason = "the demo is network-free", allow-invalid = true },
+    { path = "tokio::net::TcpListener", reason = "the demo is network-free", allow-invalid = true },
+    { path = "tokio::net::TcpSocket", reason = "the demo is network-free", allow-invalid = true },
+    { path = "tokio::net::UdpSocket", reason = "the demo is network-free", allow-invalid = true },
+    { path = "tokio::net::UnixStream", reason = "the demo is network-free", allow-invalid = true },
+    { path = "tokio::net::UnixListener", reason = "the demo is network-free", allow-invalid = true },
+    { path = "std::process::Command", reason = "the demo runs no programs" },
+    { path = "tokio::process::Command", reason = "the demo runs no programs", allow-invalid = true },
+]

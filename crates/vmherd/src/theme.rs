@@ -30,6 +30,10 @@ pub const TILE_HEAD: f32 = 28.0;
 /// Console area aspect ratio (width / height) of a tile.
 pub const SCREEN_ASPECT: f32 = 16.0 / 10.0;
 
+/// JetBrains Mono, also handed to the demo cluster for its consoles (statics: embedded once).
+pub static JETBRAINS_MONO: &[u8] = include_bytes!("../../../assets/fonts/JetBrainsMono-Regular.ttf");
+pub static JETBRAINS_MONO_BOLD: &[u8] = include_bytes!("../../../assets/fonts/JetBrainsMono-Bold.ttf");
+
 const BOLD: &str = "bold";
 const MONO_BOLD: &str = "mono-bold";
 
@@ -65,8 +69,8 @@ pub fn install(ctx: &egui::Context) {
     fonts
         .font_data
         .insert("barlow-bold".into(), font(include_bytes!("../../../assets/fonts/BarlowSemiCondensed-Bold.ttf")));
-    fonts.font_data.insert("jbmono".into(), font(include_bytes!("../../../assets/fonts/JetBrainsMono-Regular.ttf")));
-    fonts.font_data.insert("jbmono-bold".into(), font(include_bytes!("../../../assets/fonts/JetBrainsMono-Bold.ttf")));
+    fonts.font_data.insert("jbmono".into(), font(JETBRAINS_MONO));
+    fonts.font_data.insert("jbmono-bold".into(), font(JETBRAINS_MONO_BOLD));
 
     // Symbols (▾ ↵ ● ⌘ ✕ ...) fall back to JetBrains Mono, then egui's bundled fonts (Hack, emoji).
     let bundled_prop = fonts.families.get(&FontFamily::Proportional).cloned().unwrap_or_default();

@@ -85,12 +85,12 @@
       <li><strong>Settings</strong>: your cluster bookmarks (name, API URL, API token ID), the pinned certificate fingerprints, the grid layout per cluster and your preferences. These are stored locally in the app's sandbox container on your Mac.</li>
       <li><strong>Token secrets</strong>: stored only in your macOS Keychain, as the app's own Keychain items, never in the settings file. Deleting a bookmark removes its secret from the Keychain.</li>
     </ul>
-    <p>This data stays on your Mac. We cannot see it and never receive it. Removing the app removes its container; your Keychain items can be removed by deleting the bookmarks first, or with the Keychain Access app.</p>
+    <p>This data stays on your Mac. We cannot see it and never receive it. To remove it all, delete your bookmarks in the app first (this removes their Keychain items), then delete the app. Moving the app to the Trash does not always remove its container: the settings may stay in <code>~/Library/Containers/app.vmherd</code> until you delete that folder. Leftover Keychain items can be removed with the Keychain Access app.</p>
     <h3>Your Proxmox servers</h3>
     <p>Your Proxmox VE servers log their own activity, for example a console task for every console that VMherd opens. Those logs are on your servers and under your control; we have no access to them.</p>
 
     <h2 id="apple">3. Buying through Apple</h2>
-    <p>VMherd is sold and delivered by Apple through the Mac App Store. Apple processes your purchase and payment under its own privacy policy; we do not receive your name, email address or payment details. Apple gives developers aggregated sales reports and, only if you chose to share analytics with app developers in your Mac's settings, aggregated usage statistics. We cannot identify you from these.</p>
+    <p>VMherd is sold and delivered by Apple through the Mac App Store. Apple processes your purchase and payment under its own privacy policy; we do not receive your name, email address or payment details. Apple gives developers aggregated sales reports and, only if you chose to share analytics with app developers in your Mac's settings, usage statistics and crash reports. These do not identify you to us.</p>
 
     <h2 id="website">4. This website</h2>
     <p>vmherd.app is a static website. It sets <strong>no cookies</strong>, uses no local storage for tracking, runs no analytics and loads nothing from third parties: fonts, images and scripts are served from vmherd.app itself.</p>

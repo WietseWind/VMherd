@@ -11,6 +11,7 @@ use pve::{PowerAction, VmResource};
 use rfb::ClientInput;
 use tokio::sync::mpsc::UnboundedSender;
 
+use crate::backend::Backend;
 use crate::console::{ConnState, Console};
 use crate::texture::ScreenTexture;
 use crate::theme;
@@ -121,6 +122,12 @@ impl Tile {
         }
     }
 
+    /// Show a power button armed, as after its first click (scripted screenshots).
+    #[cfg(feature = "store-shots")]
+    pub fn arm(&mut self, action: PowerAction) {
+        self.armed = Some((action, Instant::now()));
+    }
+
     pub fn reconnect(&mut self) {
         self.console = None;
         self.live = false;
@@ -135,7 +142,7 @@ impl Tile {
     pub fn tick(
         &mut self,
         rt: &tokio::runtime::Handle,
-        client: &pve::Client,
+        backend: &Backend,
         ctx: &egui::Context,
         now: Instant,
     ) -> Option<Duration> {
@@ -173,7 +180,7 @@ impl Tile {
                 _ => {
                     self.next_attempt = None;
                     self.note = "Connecting…".into();
-                    self.console = Some(Console::open(rt, client.clone(), self.vm.vm_ref(), ctx.clone()));
+                    self.console = Some(Console::open(rt, backend.clone(), self.vm.vm_ref(), ctx.clone()));
                 }
             }
         }

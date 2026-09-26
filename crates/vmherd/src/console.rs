@@ -1,8 +1,11 @@
-//! One live console: `vncproxy` + websocket + RFB session on the tokio runtime.
+//! One live console: `vncproxy` + websocket + RFB session on the tokio runtime (or, for the demo
+//! cluster, an in-process pipe to a simulated VM).
 
 use std::sync::{Arc, Mutex, PoisonError};
 
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
+
+use crate::backend::Backend;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConnState {
@@ -21,7 +24,7 @@ pub struct Console {
 }
 
 impl Console {
-    pub fn open(rt: &tokio::runtime::Handle, client: pve::Client, vm: pve::VmRef, ctx: egui::Context) -> Self {
+    pub fn open(rt: &tokio::runtime::Handle, backend: Backend, vm: pve::VmRef, ctx: egui::Context) -> Self {
         let fb = rfb::SharedFramebuffer::default();
         let (input, rx) = unbounded_channel();
         let state = Arc::new(Mutex::new(ConnState::Connecting));
@@ -42,10 +45,17 @@ impl Console {
             let state = Arc::clone(&state);
             async move {
                 let result = async {
-                    let (stream, password) = client.open_console(&vm).await.map_err(|e| e.to_string())?;
-                    rfb::run(stream, rfb::Config::with_password(password), fb, rx, notify)
-                        .await
-                        .map_err(|e| e.to_string())
+                    match backend {
+                        Backend::Pve(client) => {
+                            let (stream, password) = client.open_console(&vm).await.map_err(|e| e.to_string())?;
+                            rfb::run(stream, rfb::Config::with_password(password), fb, rx, notify).await
+                        }
+                        Backend::Demo(cluster) => {
+                            let stream = cluster.open_console(vm.vmid).await?;
+                            rfb::run(stream, rfb::Config::default(), fb, rx, notify).await
+                        }
+                    }
+                    .map_err(|e| e.to_string())
                 }
                 .await;
                 if let Err(e) = &result {

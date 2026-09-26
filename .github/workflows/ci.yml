@@ -45,8 +45,14 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Clippy (store screenshot scenes)
+        if: runner.os == 'macOS'
+        run: cargo clippy -p vmherd --all-targets --locked --features store-shots -- -D warnings
       - name: Tests
         run: cargo test --workspace --locked
+      - name: Demo cluster stays offline
+        if: runner.os == 'Linux'
+        run: tools/check-demo-offline.sh
       - name: Linux secrets without a Secret Service
         if: runner.os == 'Linux'
         # A bus that does not exist: unset, zbus would fall back to the runner's /run/user/<uid>/bus.

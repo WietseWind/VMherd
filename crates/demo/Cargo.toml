@@ -1,0 +1,24 @@
+[package]
+name = "demo"
+description = "VMherd's built-in demo cluster: simulated VMs with RFB consoles, served in-process (no network)"
+version.workspace = true
+publish = false
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+# No HTTP, TLS, websocket or socket crates: the demo never touches the network (see clippy.toml).
+[dependencies]
+# Not the workspace tokio: that one has the `net` feature.
+tokio = { version = "1.53", features = ["rt", "sync", "time", "io-util", "macros"] }
+# The versions and features epaint already uses to rasterize glyphs: nothing new is compiled.
+skrifa = { version = "0.44", default-features = false, features = ["std"] }
+vello_cpu = { version = "0.1", default-features = false, features = ["std", "u8_pipeline"] }
+
+[dev-dependencies]
+rfb.workspace = true
+tokio = { version = "1.53", features = ["rt-multi-thread", "test-util"] }

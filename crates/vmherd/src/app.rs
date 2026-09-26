@@ -13,6 +13,7 @@ use pve::{PowerAction, TaskStatus, VmResource};
 use rfb::ClientInput;
 use uuid::Uuid;
 
+use crate::backend::{self, Backend};
 use crate::bar::{self, Bar};
 use crate::clusters::{self, ClusterAction, ClustersUi};
 use crate::config::{Bookmark, Config};
@@ -25,6 +26,12 @@ use crate::tile::{self, Tile, TileAction, TileView};
 use crate::toast::Toasts;
 use crate::typing::{self, Typing};
 use crate::widgets::{self, PlateStyle};
+
+#[cfg(feature = "store-shots")]
+#[path = "scenes.rs"]
+mod scenes;
+#[cfg(feature = "store-shots")]
+pub use scenes::NAMES as SCENES;
 
 const POLL: Duration = Duration::from_secs(3);
 const MANY_CONSOLES: usize = 24;
@@ -40,6 +47,11 @@ pub struct Startup {
     pub cluster: Option<String>,
     pub vmids: Vec<u32>,
     pub screenshot: Option<(PathBuf, f64)>,
+    /// Start in the demo cluster; settings are neither loaded nor saved.
+    pub demo: bool,
+    /// `--scene NAME --out FILE` (store-shots builds only).
+    #[cfg(feature = "store-shots")]
+    pub scene: Option<(String, PathBuf)>,
 }
 
 enum ConnectError {
@@ -85,7 +97,7 @@ enum Msg {
 struct Session {
     id: Uuid,
     name: String,
-    client: pve::Client,
+    backend: Backend,
     host: String,
     vms: BTreeMap<u32, VmResource>,
     loaded: bool,
@@ -157,6 +169,12 @@ pub struct App {
     /// VMIDs from the command line, for this bookmark only
     startup_grid: Option<(Uuid, Vec<u32>)>,
     screenshot: Option<Screenshot>,
+    /// false after `--demo`: nothing is read from or written to the settings file
+    persist: bool,
+    /// The real settings while the demo (started from the clusters screen) runs with defaults.
+    stash: Option<Config>,
+    #[cfg(feature = "store-shots")]
+    scene: Option<scenes::Scene>,
 }
 
 impl App {
@@ -168,7 +186,7 @@ impl App {
             .enable_all()
             .build()?;
         let (tx, rx) = mpsc::channel();
-        let (cfg, warning) = Config::load();
+        let (cfg, warning) = if startup.demo { (Config::default(), None) } else { Config::load() };
         let mut app = Self {
             rt,
             tx,
@@ -196,9 +214,19 @@ impl App {
             trust: None,
             startup_grid: None,
             screenshot: startup.screenshot.map(|(path, at)| Screenshot { path, at, requested: false }),
+            persist: !startup.demo,
+            stash: None,
+            #[cfg(feature = "store-shots")]
+            scene: startup.scene.map(|(name, out)| scenes::Scene::new(&name, out)),
         };
         if let Some(w) = warning {
             app.toasts.error(w);
+        }
+        if startup.demo {
+            if app.scene_wants_demo() {
+                app.connect_demo(startup.vmids);
+            }
+            return Ok(app);
         }
         let wanted = match &startup.cluster {
             Some(name) => {
@@ -228,9 +256,16 @@ impl App {
 
     fn save_now(&mut self) {
         self.save_at = None;
+        if !self.persist || self.in_demo() {
+            return; // the demo never touches the settings file
+        }
         if let Err(e) = self.cfg.save() {
             self.toasts.error(format!("Cannot save settings: {e:#}"));
         }
+    }
+
+    fn in_demo(&self) -> bool {
+        self.session.as_ref().is_some_and(|s| s.backend.is_demo())
     }
 
     fn bookmark_mut(&mut self) -> Option<&mut Bookmark> {
@@ -302,7 +337,57 @@ impl App {
         self.session = None;
         self.picker.open = false;
         self.confirm = None;
+        if let Some(cfg) = self.stash.take() {
+            self.cfg = cfg; // leaving the demo: back to the real settings
+            self.save_at = None; // asked for in the demo; the real settings were saved before it
+        }
         self.ctx.send_viewport_cmd(ViewportCommand::Title("VMherd".into()));
+    }
+
+    /// The built-in demo cluster: simulated VMs, no network, nothing saved. `grid`: the VMIDs to
+    /// show (none = the production web, database and k8s VMs).
+    fn connect_demo(&mut self, grid: Vec<u32>) {
+        let backend = match Backend::demo() {
+            Ok(b) => b,
+            Err(e) => {
+                self.toasts.error(format!("Cannot start the demo: {e}"));
+                return;
+            }
+        };
+        if self.save_at.is_some() {
+            self.save_now();
+        }
+        self.disconnect();
+        self.clusters.close_form();
+        self.epoch += 1;
+        self.status = clusters::Status::default();
+        self.trust = None;
+        if self.persist {
+            // the demo runs with default settings; the real ones come back on leaving
+            self.stash = Some(std::mem::take(&mut self.cfg));
+        }
+        let grid = if grid.is_empty() { demo::DEFAULT_GRID.to_vec() } else { grid };
+        self.startup_grid = Some((Uuid::nil(), grid));
+        self.ctx.send_viewport_cmd(ViewportCommand::Title(format!("VMherd — {}", backend::DEMO_NAME)));
+        self.session = Some(Session {
+            id: Uuid::nil(),
+            name: backend::DEMO_NAME.into(),
+            host: backend.host_label(),
+            backend,
+            vms: BTreeMap::new(),
+            loaded: false,
+            error: None,
+            next_poll: Instant::now(),
+            polling: false,
+            tasks: Vec::new(),
+        });
+        self.toasts.info("13 simulated VMs — press Enter to type into all of them");
+        self.poll_vms();
+    }
+
+    #[cfg(not(feature = "store-shots"))]
+    fn scene_wants_demo(&self) -> bool {
+        true
     }
 
     /// A connect for `id` that is still running no longer matters (bookmark edited or deleted).
@@ -323,6 +408,11 @@ impl App {
     /// sync list and pin stay (the pin is dropped when asked or when the URL changes).
     fn save_bookmark(&mut self, edited: Bookmark, secret: Option<String>, forget_pin: bool) -> Result<(), String> {
         let id = edited.id;
+        if !self.persist {
+            return Err(
+                "VMherd was started with --demo, so nothing is saved. Start it without --demo to add clusters.".into(),
+            );
+        }
         if let Some(secret) = &secret {
             secrets::set(id, &edited.secret, secret)?;
         }
@@ -353,9 +443,9 @@ impl App {
             return;
         }
         s.polling = true;
-        let (client, tx, ctx, epoch) = (s.client.clone(), self.tx.clone(), self.ctx.clone(), self.epoch);
+        let (backend, tx, ctx, epoch) = (s.backend.clone(), self.tx.clone(), self.ctx.clone(), self.epoch);
         self.rt.spawn(async move {
-            let result = client.vms().await.map_err(|e| e.to_string());
+            let result = backend.vms().await;
             let _ = tx.send(Msg::Vms { epoch, result });
             ctx.request_repaint();
         });
@@ -368,17 +458,14 @@ impl App {
                 match result {
                     Ok((client, version)) => {
                         let Some(b) = self.cfg.bookmark(id) else { return };
-                        let host =
-                            client.base_url().host_str().map_or_else(String::new, |h| match client.base_url().port() {
-                                Some(p) => format!("{h}:{p}"),
-                                None => h.to_owned(),
-                            });
+                        let backend = Backend::Pve(client);
+                        let host = backend.host_label();
                         tracing::info!("connected to {} (Proxmox {})", b.name, version.version);
                         self.ctx.send_viewport_cmd(ViewportCommand::Title(format!("VMherd — {}", b.name)));
                         self.session = Some(Session {
                             id,
                             name: b.name.clone(),
-                            client,
+                            backend,
                             host,
                             vms: BTreeMap::new(),
                             loaded: false,
@@ -517,11 +604,11 @@ impl App {
     fn power(&mut self, vmid: u32, action: PowerAction) {
         let (Some(s), Some(t)) = (&self.session, self.tiles.iter().find(|t| t.vmid() == vmid)) else { return };
         let label = format!("{} {}", vmid, t.vm.name.as_deref().unwrap_or(""));
-        let (client, vm, tx, ctx, epoch) =
-            (s.client.clone(), t.vm.vm_ref(), self.tx.clone(), self.ctx.clone(), self.epoch);
+        let (backend, vm, tx, ctx, epoch) =
+            (s.backend.clone(), t.vm.vm_ref(), self.tx.clone(), self.ctx.clone(), self.epoch);
         tracing::info!("power {} {label} on {}", action.as_str(), vm.node);
         let handle = self.rt.spawn(async move {
-            let result = client.power(&vm, action).await.map_err(|e| e.to_string());
+            let result = backend.power(&vm, action).await;
             let node = vm.node;
             let _ = tx.send(Msg::Power { epoch, vmid, node, label, action, result });
             ctx.request_repaint();
@@ -533,19 +620,19 @@ impl App {
 
     fn watch_task(&mut self, vmid: u32, node: String, label: String, action: PowerAction, upid: String) {
         let Some(s) = &self.session else { return };
-        let (client, tx, ctx, epoch) = (s.client.clone(), self.tx.clone(), self.ctx.clone(), self.epoch);
+        let (backend, tx, ctx, epoch) = (s.backend.clone(), self.tx.clone(), self.ctx.clone(), self.epoch);
         let handle = self.rt.spawn(async move {
             let mut last_err = String::from("timed out");
             for _ in 0..300 {
                 tokio::time::sleep(Duration::from_secs(1)).await;
-                match client.task_status(&node, &upid).await {
+                match backend.task_status(&node, &upid).await {
                     Ok(t) if t.is_done() => {
                         let _ = tx.send(Msg::Task { epoch, vmid, label, action, result: Ok(t) });
                         ctx.request_repaint();
                         return;
                     }
                     Ok(_) => {}
-                    Err(e) => last_err = e.to_string(),
+                    Err(e) => last_err = e,
                 }
             }
             let _ = tx.send(Msg::Task { epoch, vmid, label, action, result: Err(last_err) });
@@ -701,11 +788,11 @@ impl App {
             vms.len(),
             if vms.len() == 1 { "" } else { "s" }
         ));
-        let (client, tx, ctx, epoch) = (s.client.clone(), self.tx.clone(), self.ctx.clone(), self.epoch);
+        let (backend, tx, ctx, epoch) = (s.backend.clone(), self.tx.clone(), self.ctx.clone(), self.epoch);
         let handle = self.rt.spawn(async move {
             let lookups = vms.into_iter().map(|(vmid, label, vm)| {
-                let client = client.clone();
-                async move { (vmid, label, client.guest_ips(&vm).await.map_err(|e| widgets::sentence(&e.to_string()))) }
+                let backend = backend.clone();
+                async move { (vmid, label, backend.guest_ips(&vm).await.map_err(|e| widgets::sentence(&e))) }
             });
             let results = futures_join_all(lookups).await;
             let _ = tx.send(Msg::Ips { epoch, target, text, results });
@@ -780,12 +867,12 @@ impl App {
         );
         ui.label(brand);
 
-        if let Some(name) = self.session.as_ref().map(|s| s.name.clone()) {
+        if let Some((name, demo)) = self.session.as_ref().map(|s| (s.name.clone(), s.backend.is_demo())) {
             let others: Vec<(Uuid, String)> = self
                 .cfg
                 .bookmarks
                 .iter()
-                .filter(|b| Some(b.id) != self.session.as_ref().map(|s| s.id))
+                .filter(|b| !demo && Some(b.id) != self.session.as_ref().map(|s| s.id))
                 .map(|b| (b.id, b.name.clone()))
                 .collect();
             let mut switch = None;
@@ -799,10 +886,15 @@ impl App {
                 if !others.is_empty() {
                     ui.separator();
                 }
-                if ui.button("Manage clusters…").clicked() || ui.button("Disconnect").clicked() {
+                if demo {
+                    disconnect = ui.button("Leave demo").clicked();
+                } else if ui.button("Manage clusters…").clicked() || ui.button("Disconnect").clicked() {
                     disconnect = true;
                 }
             });
+            if demo {
+                demo_badge(&mut ui);
+            }
             if let Some(id) = switch {
                 self.connect(id);
             } else if disconnect {
@@ -1113,8 +1205,9 @@ impl App {
                 RichText::new(
                     "Fonts: Barlow and JetBrains Mono (SIL Open Font License 1.1); egui's bundled fonts. \
                      Built with egui, tokio, rustls and other open-source Rust crates: their licenses are in \
-                     THIRD-PARTY-LICENSES.md, shipped with the app. Proxmox is a trademark of Proxmox Server \
-                     Solutions GmbH; VMherd is not affiliated with it.",
+                     THIRD-PARTY-LICENSES.md, shipped with the app. Proxmox is a registered trademark of \
+                     Proxmox Server Solutions GmbH. VMherd is not affiliated with or endorsed by Proxmox Server \
+                     Solutions GmbH.",
                 )
                 .color(theme::MUTED)
                 .small(),
@@ -1269,8 +1362,9 @@ impl App {
         if let Some(image) = image {
             let path = shot.path.clone();
             let [w, h] = image.size;
-            let bytes: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
-            match image::save_buffer(&path, &bytes, w as u32, h as u32, image::ColorType::Rgba8) {
+            // RGB without alpha: App Store Connect rejects screenshots with an alpha channel
+            let bytes: Vec<u8> = image.pixels.iter().flat_map(|c| [c.r(), c.g(), c.b()]).collect();
+            match image::save_buffer(&path, &bytes, w as u32, h as u32, image::ColorType::Rgb8) {
                 Ok(()) => eprintln!("screenshot saved to {}", path.display()),
                 Err(e) => eprintln!("screenshot failed: {e}"),
             }
@@ -1294,6 +1388,15 @@ where
         }
     }
     out
+}
+
+/// The amber DEMO plate next to the session menu.
+fn demo_badge(ui: &mut Ui) {
+    let g = ui.painter().layout_job(widgets::spaced("DEMO", theme::bold(10.0), Color32::BLACK, 2.0));
+    let (r, resp) = ui.allocate_exact_size(vec2(g.size().x + 12.0, 18.0), Sense::hover());
+    ui.painter().rect_filled(r, 3.0, theme::AMBER);
+    ui.painter().galley(r.center() - g.size() / 2.0, g, Color32::BLACK);
+    resp.on_hover_text("Simulated VMs: nothing here touches a real server or the network, and nothing is saved");
 }
 
 fn power_label(a: PowerAction) -> &'static str {
@@ -1340,9 +1443,9 @@ impl eframe::App for App {
         if let Some(s) = &self.session {
             let now = Instant::now();
             let mut wake = if s.polling { POLL } else { s.next_poll.saturating_duration_since(now) };
-            let (client, rt) = (s.client.clone(), self.rt.handle().clone());
+            let (backend, rt) = (s.backend.clone(), self.rt.handle().clone());
             for t in &mut self.tiles {
-                if let Some(d) = t.tick(&rt, &client, ctx, now) {
+                if let Some(d) = t.tick(&rt, &backend, ctx, now) {
                     wake = wake.min(d);
                 }
             }
@@ -1419,6 +1522,7 @@ impl eframe::App for App {
                 if let Some(action) = self.clusters.ui(ui, &self.cfg, &self.status) {
                     match action {
                         ClusterAction::Connect(id) => self.connect(id),
+                        ClusterAction::Demo => self.connect_demo(Vec::new()),
                         ClusterAction::Save { bookmark, secret, forget_pin } => {
                             let result = self.save_bookmark(*bookmark, secret, forget_pin);
                             self.clusters.finish_save(result);
@@ -1465,7 +1569,13 @@ impl eframe::App for App {
         self.dialogs(&ctx);
         let bottom = if self.session.is_some() { content.bottom() - bar::HEIGHT } else { content.bottom() };
         self.toasts.ui(&ctx, content.right(), bottom);
+        #[cfg(feature = "store-shots")]
+        self.drive_scene(&ctx);
         self.handle_screenshot(&ctx);
+    }
+
+    fn persist_egui_memory(&self) -> bool {
+        self.persist
     }
 
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {

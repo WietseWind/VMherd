@@ -1,6 +1,6 @@
 //! Persisted settings: cluster bookmarks (without secrets), per-cluster grid, UI preferences.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Context as _;
 use serde::{Deserialize, Serialize};
@@ -99,6 +99,15 @@ pub struct Config {
     pub save_blocked: Option<String>,
 }
 
+/// `path` for display, with the home directory as `~` (no user name in messages or screenshots).
+pub fn tilde(path: &Path) -> String {
+    let home = directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf());
+    match home.as_deref().and_then(|h| path.strip_prefix(h).ok()) {
+        Some(rest) => Path::new("~").join(rest).display().to_string(),
+        None => path.display().to_string(),
+    }
+}
+
 impl Config {
     pub fn path() -> Option<PathBuf> {
         directories::ProjectDirs::from("", "", "VMherd").map(|d| d.config_dir().join("config.json"))
@@ -118,17 +127,17 @@ impl Config {
                     match std::fs::rename(&path, &backup) {
                         Ok(()) => (
                             Self::default(),
-                            Some(format!("{} was unreadable ({e}); moved to {}", path.display(), backup.display())),
+                            Some(format!("{} was unreadable ({e}); moved to {}", tilde(&path), tilde(&backup))),
                         ),
                         Err(re) => Self::blocked(format!(
                             "{} is unreadable ({e}) and could not be moved aside ({re}); settings are not saved",
-                            path.display()
+                            tilde(&path)
                         )),
                     }
                 }
             },
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => (Self::default(), None),
-            Err(e) => Self::blocked(format!("Cannot read {} ({e}); settings are not saved", path.display())),
+            Err(e) => Self::blocked(format!("Cannot read {} ({e}); settings are not saved", tilde(&path))),
         }
     }
 
@@ -143,11 +152,11 @@ impl Config {
         }
         let path = Self::path().context("no config directory")?;
         let dir = path.parent().context("config path has no parent")?;
-        std::fs::create_dir_all(dir).with_context(|| format!("create {}", dir.display()))?;
+        std::fs::create_dir_all(dir).with_context(|| format!("create {}", tilde(dir)))?;
         let tmp = path.with_extension("json.tmp");
         let json = serde_json::to_vec_pretty(self)?;
-        write_private(&tmp, &json).with_context(|| format!("write {}", tmp.display()))?;
-        std::fs::rename(&tmp, &path).with_context(|| format!("replace {}", path.display()))?;
+        write_private(&tmp, &json).with_context(|| format!("write {}", tilde(&tmp)))?;
+        std::fs::rename(&tmp, &path).with_context(|| format!("replace {}", tilde(&path)))?;
         Ok(())
     }
 
@@ -200,5 +209,15 @@ mod tests {
         assert_eq!(back, cfg);
         let empty: Config = serde_json::from_str("{}").unwrap();
         assert_eq!(empty.prefs.delay_ms, 20);
+    }
+
+    #[test]
+    fn paths_show_the_home_directory_as_tilde() {
+        let home = directories::BaseDirs::new().unwrap().home_dir().to_path_buf();
+        let shown = tilde(&home.join("Library").join("VMherd").join("config.json"));
+        assert_eq!(shown, Path::new("~").join("Library").join("VMherd").join("config.json").display().to_string());
+        assert!(!shown.contains(&*home.to_string_lossy()));
+        let elsewhere = Path::new("/etc/vmherd.json");
+        assert_eq!(tilde(elsewhere), elsewhere.display().to_string());
     }
 }
