@@ -432,6 +432,7 @@ kbd {
 .price {
   display: flex;
   flex-direction: column;
+  margin: 0;
   line-height: 1.2;
 }
 .price strong {
@@ -522,6 +523,16 @@ kbd {
 .chips li::before {
   content: "● ";
   color: var(--green);
+}
+
+.hero-note {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+.platforms-note {
+  max-width: 46em;
+  margin: clamp(20px, 3vw, 32px) 0 0;
 }
 
 /* ---------- hero illustration: one keystroke stream fanning out to many consoles ---------- */

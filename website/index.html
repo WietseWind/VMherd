@@ -94,6 +94,7 @@
         <li>no account</li>
         <li>no analytics</li>
       </ul>
+      <p class="hero-note">Built in Rust. Distributed for macOS through the Mac App Store; the same code runs on <a href="#platforms">Linux and Windows (beta)</a>.</p>
     </div>
 
     <!-- Illustration: one keystroke stream fanning out to many consoles (animated by site.js). -->
@@ -152,7 +153,7 @@
       <ul class="ticks">
         <li>Every tile shows <strong>VMID, name and a status lamp</strong> above its live console, plus node and uptime when there is room.</li>
         <li>Consoles <strong>connect by themselves</strong> while a VM runs, so you see it boot, and reconnect after a drop.</li>
-        <li>Tiles appear in the order you pick them. <strong>Automatic layout or 1 to 8 columns</strong>, remembered per cluster.</li>
+        <li>Tiles appear in the order you pick them, in an <strong>automatic layout or up to 8 columns</strong>. Each cluster remembers its grid.</li>
         <li>Consoles open in <strong>shared mode</strong>: a Proxmox web console that is already open stays connected.</li>
       </ul>
     </div>
@@ -224,7 +225,7 @@ echo "<span class="ph">{{vmid}}</span> on <span class="ph">{{node}}</span>: <spa
         </table>
       </div>
       <ul class="ticks">
-        <li><code>{{ipv4}}</code> and <code>{{ipv6}}</code> come from the QEMU guest agent or the container's interfaces. A VM without an address gets nothing typed.</li>
+        <li><code>{{ipv4}}</code> and <code>{{ipv6}}</code> come from the QEMU guest agent or the container's interfaces. A VM without an address gets nothing typed. For VMs the token also needs <code>VM.Monitor</code> (Proxmox VE 8) or <code>VM.GuestAgent.Audit</code> (Proxmox VE 9).</li>
         <li>Adjustable per-character delay (20 ms by default) for reliable input; optionally press <kbd>↵</kbd> after.</li>
       </ul>
     </div>
@@ -384,14 +385,43 @@ echo "<span class="ph">{{vmid}}</span> on <span class="ph">{{node}}</span>: <spa
   </div>
 </section>
 
+<!-- platforms -->
+<section class="section" id="platforms" aria-labelledby="plat">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow"><span class="n">07</span> Built in Rust</p>
+      <h2 id="plat">One Rust codebase. Mac first.</h2>
+      <p class="lede soft">VMherd is written in Rust, with its own VNC client and a GPU-drawn interface (egui). The same code builds for Linux and Windows.</p>
+    </div>
+    <div class="cards">
+      <article class="card">
+        <span class="ico" aria-hidden="true">[macos]</span>
+        <h3>macOS: Mac App Store</h3>
+        <p>The supported release. A universal app for Apple silicon and Intel, signed and sandboxed, with updates through the Mac App Store. Token secrets live in your Keychain.</p>
+      </article>
+      <article class="card steel">
+        <span class="ico" aria-hidden="true">[linux: beta]</span>
+        <h3>Linux (beta)</h3>
+        <p>Build it from source. Wayland or X11. Token secrets go to a Secret Service keyring such as GNOME Keyring, or to a private file when there is none.</p>
+      </article>
+      <article class="card steel">
+        <span class="ico" aria-hidden="true">[windows: beta]</span>
+        <h3>Windows (beta)</h3>
+        <p>Build it from source. Token secrets go to the Windows Credential Manager.</p>
+      </article>
+    </div>
+    <p class="soft platforms-note">Beta means built and tested on every commit, but used less day to day than the Mac app. Source and build instructions are on <a href="https://github.com/WietseWind/VMherd">GitHub</a>. Builds you make yourself fall under the source license: free for non-commercial use.</p>
+  </div>
+</section>
+
 <!-- requirements + faq -->
 <section class="section" id="faq" aria-labelledby="need">
   <div class="wrap two">
     <div>
-      <p class="eyebrow"><span class="n">07</span> What you need</p>
+      <p class="eyebrow"><span class="n">08</span> What you need</p>
       <h2 id="need">Three things.</h2>
       <ol class="needs">
-        <li><strong>A Mac</strong> with Apple silicon or an Intel processor.</li>
+        <li><strong>A Mac</strong> with Apple silicon or an Intel processor (or Linux or Windows for the <a href="#platforms">beta builds</a>).</li>
         <li><strong>Proxmox VE</strong>, a cluster or a single node, reachable from your Mac over HTTPS (usually port 8006).</li>
         <li><strong>An API token</strong> with <code>VM.Audit</code> and <code>VM.Console</code>, plus <code>VM.PowerMgmt</code> for the power buttons.</li>
       </ol>
@@ -438,6 +468,12 @@ pveum user token add vmherd@pve grid --privsep 0</code></pre>
         <div><p>No. VMherd opens consoles in shared mode, so a noVNC console in the Proxmox web interface stays connected.</p></div>
       </details>
       <details>
+        <summary>Does it run on Linux or Windows?</summary>
+        <div>
+          <p>Yes, in beta. VMherd is written in Rust and the same code builds for Linux and Windows; CI builds and tests it on all three on every commit. There are no store builds for those yet: build it from the <a href="https://github.com/WietseWind/VMherd">source on GitHub</a>. On Linux, token secrets go to a Secret Service keyring; on Windows, to the Credential Manager.</p>
+        </div>
+      </details>
+      <details>
         <summary>Is the source code available? What is the license?</summary>
         <div>
           <p>Yes. The source is on <a href="https://github.com/WietseWind/VMherd">GitHub</a>, source-available under the PolyForm Noncommercial License 1.0.0; it also builds for Linux and Windows.</p>
@@ -480,6 +516,7 @@ pveum user token add vmherd@pve grid --privsep 0</code></pre>
           KvK (Dutch CoC) # 64731464<br>
           T. <a href="tel:+31332104141">+31 33 210 4141</a> · <a href="mailto:support@vmherd.app">support@vmherd.app</a>
         </address>
+        <p class="foot-company"><a href="https://theintegrators.nl">Open The Integrators BV site &rarr;</a></p>
       </div>
       <nav aria-label="Legal and support">
         <h2>Help</h2>
