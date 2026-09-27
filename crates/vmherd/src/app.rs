@@ -1559,7 +1559,9 @@ impl eframe::App for App {
             } else {
                 ui.painter().rect_filled(ui.max_rect(), 0.0, theme::BG);
                 widgets::grid_background(ui.painter(), ui.max_rect());
-                if let Some(action) = self.clusters.ui(ui, &self.cfg, &self.status, self.persist) {
+                // the "home" store screenshot runs with --demo but shows the footer users see
+                let saves = self.persist || !self.scene_wants_demo();
+                if let Some(action) = self.clusters.ui(ui, &self.cfg, &self.status, saves) {
                     match action {
                         ClusterAction::Connect(id) => self.connect(id),
                         ClusterAction::Demo => self.connect_demo(Vec::new()),
