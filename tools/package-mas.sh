@@ -27,7 +27,7 @@ source tools/macos-common.sh
 mode=${1:-}
 case $mode in
   "" | --validate | --upload | --test-build) ;;
-  *) sed -n '2,21p' "$0" >&2; exit 2 ;;
+  *) sed -n '2,/^set -euo/{/^#/p;}' "$0" >&2; exit 2 ;;
 esac
 APP_IDENTITY=${APP_IDENTITY:-"Apple Distribution: The Integrators BV ($TEAM_ID)"}
 PKG_IDENTITY=${PKG_IDENTITY:-"3rd Party Mac Developer Installer: The Integrators BV ($TEAM_ID)"}
@@ -194,6 +194,13 @@ inner=$(find "$tmp/pkg" -maxdepth 4 -name VMherd.app -type d | head -1)
 codesign --verify --strict "$inner" || die "the app in the package does not verify"
 no_quarantine "$tmp/pkg"
 no_quarantine "$pkg"
+# Extended attributes that xattr -c cannot remove (com.apple.provenance, set on files written by
+# apps that macOS tracks) end up as AppleDouble ._ files in the payload. App Store Connect accepted
+# them in validation; a build started from Terminal usually has none.
+payload=$(pkgutil --payload-files "$pkg")   # captured: grep -q would cut the pipe (pipefail)
+if grep -q '/\._' <<<"$payload"; then
+  echo "warning: $pkg contains AppleDouble (._) files: $(xattr "$app/Contents/Info.plist" | tr '\n' ' ')" >&2
+fi
 echo "built $pkg (version $version, build $build)"
 
 if [ "$mode" = --validate ] || [ "$mode" = --upload ]; then

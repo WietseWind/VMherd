@@ -10,7 +10,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source tools/macos-common.sh
-case ${1:-} in "" | --no-submit) ;; *) sed -n '2,9p' "$0" >&2; exit 2 ;; esac
+case ${1:-} in "" | --no-submit) ;; *) sed -n '2,/^set -euo/{/^#/p;}' "$0" >&2; exit 2 ;; esac
 DEVID_IDENTITY=${DEVID_IDENTITY:-"Developer ID Application: The Integrators BV ($TEAM_ID)"}
 NOTARY_PROFILE=${NOTARY_PROFILE:-vmherd}
 app=dist/VMherd.app
