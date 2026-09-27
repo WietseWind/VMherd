@@ -61,6 +61,9 @@ jobs:
       - name: Demo cluster stays offline
         if: runner.os == 'Linux'
         run: tools/check-demo-offline.sh
+      - name: Website asset hashes are current
+        if: runner.os == 'Linux'
+        run: python3 tools/website-cachebust.py --check
       - name: Linux secrets without a Secret Service
         if: runner.os == 'Linux'
         # A bus that does not exist: unset, zbus would fall back to the runner's /run/user/<uid>/bus.
