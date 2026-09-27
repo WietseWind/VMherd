@@ -67,7 +67,8 @@ check_binary() {
     minos=$(vtool -arch "$arch" -show-build "$bin" | awk '$1 == "minos" {print $2}')
     [ "$minos" = "$MIN_MACOS" ] || die "$bin ($arch): minimum macOS '${minos:-none}', expected $MIN_MACOS"
   done
-  if strings -a "$bin" | grep -qF -e "$HOME" -e "/Users/"; then
+  # (no grep -q: it would end the pipe early, and pipefail would turn a hit into a miss)
+  if strings -a "$bin" | grep -F -e "$HOME" -e "/Users/" >/dev/null; then
     die "$bin still contains $HOME or /Users/ (build-machine paths)"
   fi
 }
