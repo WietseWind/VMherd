@@ -48,6 +48,9 @@ Notes:
 
 Secrets never go into `config.json`. Deleting a bookmark, or moving its secret elsewhere, removes what VMherd saved.
 
+The Mac App Store version runs in the App Sandbox and starts no other programs, so it only offers the Keychain. A
+bookmark that uses a Keychain item or a command (settings from another build) asks you to enter the secret again.
+
 ## Build
 
 Needs Rust (stable, see `rust-toolchain.toml`).
@@ -58,7 +61,7 @@ cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-- **macOS app**: `tools/bundle-macos.sh` → `dist/VMherd.app` (universal binary, ad-hoc signed; `--native` for this Mac only). To hand it to others, sign with a Developer ID and notarize.
+- **macOS app**: `tools/bundle-macos.sh` → `dist/VMherd.app` (universal binary, macOS 11 or later, ad-hoc signed; `--native` for this Mac only). To hand it to others, see [Releasing](#releasing).
 - **Linux**: needs the usual winit/wgpu deps (`libxkbcommon`, Wayland or X11, Vulkan or GL drivers). `packaging/linux/vmherd.desktop` + `assets/icon/vmherd-256.png` for menus. `tools/test-linux.sh` builds and tests it in Docker, with and without a Secret Service.
 - **Windows**: `cargo build --release -p vmherd`; the icon is embedded by `build.rs`.
 - **Cryptography**: on macOS VMherd uses only the operating system's: TLS through the system TLS stack and trust
@@ -69,6 +72,30 @@ cargo clippy --workspace --all-targets -- -D warnings
   `tools/check-macos-crypto.sh` fails if a third-party crypto crate enters the macOS dependency graph.
 - Licenses: `tools/licenses.sh` regenerates `THIRD-PARTY-LICENSES.md` (all crates for all platforms + the bundled fonts, via `cargo-about`); ship it with every build (the macOS bundle includes it). Run it after dependency updates.
 - Icons: edit `assets/icon/vmherd-prompt.svg` (+ `vmherd-prompt-small.svg` for 16–64 px), then `tools/make-icons.sh`. `VARIANT=proxmox` renders the private variant with a Proxmox-style X on the lead screen (`vmherd.svg`); the Proxmox logo is a trademark of Proxmox Server Solutions GmbH, so releases use the neutral `>_` set.
+
+## Releasing
+
+The version is `[workspace.package] version` in `Cargo.toml` (three numbers). The build number (`CFBundleVersion`) is
+the commit count of `HEAD`, so release from `main` only; `BUILD_NUMBER=N` overrides it (it must be higher than every
+build uploaded before).
+
+- **Mac App Store**: `tools/package-mas.sh` builds the universal binary with `--features mas` (App Sandbox build:
+  Keychain only, no child processes, no `--screenshot`, App Store license text), signs `dist/mas/VMherd.app` with the
+  Apple Distribution certificate, the entitlements in `packaging/macos/VMherd-mas.entitlements` and the embedded Mac
+  App Store profile (`MAS_PROFILE`, default `VMherd_Mac_App_Store` in `~/Library/MobileDevice/Provisioning
+  Profiles`), and builds `dist/mas/VMherd-<version>-<build>.pkg` signed with the Mac Installer Distribution
+  certificate; then it checks signatures, entitlements, profile, private APIs and cryptography.
+  - `--validate`: also let App Store Connect check the package (uploads nothing); `--upload`: validate and upload it.
+    Both need `ASC_KEY_ID` and `ASC_ISSUER` (an App Store Connect API key; altool reads
+    `~/.appstoreconnect/private_keys/AuthKey_<ASC_KEY_ID>.p8`).
+  - `--test-build`: `dist/mas-test/VMherd.app`, the same binary sandboxed and ad-hoc signed (no profile), to try the
+    sandbox on a Mac; its data lives in `~/Library/Containers/app.vmherd`.
+- **Developer ID** (download from the website): `tools/notarize-macos.sh` runs `tools/bundle-macos.sh`, signs the app
+  with the Developer ID Application certificate (hardened runtime, secure timestamp, no entitlements), zips it,
+  notarizes it with `xcrun notarytool` (keychain profile `vmherd`, or `NOTARY_PROFILE`), staples the ticket and
+  checks it with `spctl` → `dist/VMherd-<version>-macos.zip`. `--no-submit` stops before sending it to Apple.
+
+Signing keys, profiles, API keys and packages stay out of the repository (`.gitignore`).
 
 ## CI and supply chain
 
@@ -102,7 +129,7 @@ PVE_URL=https://host:8006 PVE_TOKEN_ID='user@pam!tok' PVE_TOKEN_SECRET=… PVE_T
   cargo test -p pve --test live -- --ignored               # read-only check against a real cluster
 ```
 
-`vmherd --cluster NAME --screenshot out.png [--screenshot-after 8]` saves a PNG of the window and quits (docs / visual checks).
+`vmherd --cluster NAME --screenshot out.png [--screenshot-after 8]` saves a PNG of the window and quits (docs / visual checks; not in the Mac App Store build).
 
 ## License
 
@@ -110,3 +137,6 @@ Free for noncommercial use under the [PolyForm Noncommercial License 1.0.0](LICE
 (including internal use at a company) needs a commercial license from The Integrators BV (NL), see
 [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md). Third-party components keep their own licenses:
 [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
+
+The Mac App Store version is licensed under Apple's [standard license agreement](https://www.apple.com/legal/internet-services/itunes/dev/stdeula/)
+and may be used at home and at work.

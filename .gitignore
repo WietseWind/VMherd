@@ -2,3 +2,11 @@
 .DS_Store
 *.dmg
 /dist
+# signing material and release packages never go into the repository
+*.p8
+*.p12
+*.cer
+*.certSigningRequest
+*.provisionprofile
+*.pkg
+/private_keys
