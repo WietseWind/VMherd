@@ -51,6 +51,11 @@ jobs:
       - name: Clippy (store screenshot scenes)
         if: runner.os == 'macOS'
         run: cargo clippy -p vmherd --all-targets --locked --features store-shots -- -D warnings
+      - name: Clippy + tests (Mac App Store build)
+        if: runner.os == 'macOS'
+        run: |
+          cargo clippy -p vmherd --all-targets --locked --features mas -- -D warnings
+          cargo test -p vmherd --locked --features mas
       - name: Tests
         run: cargo test --workspace --locked
       - name: Demo cluster stays offline
@@ -80,6 +85,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # the build number (CFBundleVersion) is the commit count
       - name: Rust (rust-toolchain.toml) + both macOS targets
         run: |
           rustup show active-toolchain || rustup toolchain install
