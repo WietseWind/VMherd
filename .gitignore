@@ -10,3 +10,5 @@
 *.provisionprofile
 *.pkg
 /private_keys
+# App Review correspondence, recordings and notes (private; see AppleReview/README.md locally)
+/AppleReview
