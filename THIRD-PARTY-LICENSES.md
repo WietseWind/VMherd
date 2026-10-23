@@ -1498,7 +1498,7 @@ DEALINGS IN THE SOFTWARE.
 ```
 ## Boost Software License 1.0
 
-Used by: clipboard-win 5.4.1
+Used by: clipboard-win 5.4.3
 
 ```
 Boost Software License - Version 1.0 - August 17th, 2003
@@ -1551,7 +1551,7 @@ THIS SOFTWARE.
 ```
 ## ISC License
 
-Used by: rustls-webpki 0.103.15
+Used by: rustls-webpki 0.103.16
 
 ```
 Except as otherwise noted, this project is licensed under the following
@@ -2513,7 +2513,7 @@ DEALINGS IN THE SOFTWARE.
 ```
 ## MIT License
 
-Used by: rustls-native-certs 0.8.4, rustls 0.23.45
+Used by: rustls-native-certs 0.8.4, rustls 0.23.46
 
 ```
 Copyright (c) 2016 Joseph Birr-Pixton <jpixton@gmail.com>
@@ -4657,7 +4657,7 @@ DEALINGS IN THE SOFTWARE.
 ```
 ## MIT License
 
-Used by: ctutils 0.4.2
+Used by: ctutils 0.4.5
 
 ```
 Copyright (c) 2025-2026 The RustCrypto Project Developers
