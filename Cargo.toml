@@ -15,8 +15,8 @@ rust-version = "1.89"
 rfb = { path = "crates/rfb" }
 pve = { path = "crates/pve" }
 demo = { path = "crates/demo" }
-eframe = { version = "0.36", features = ["persistence"] }
-egui = "0.36"
+eframe = { version = "0.37", features = ["persistence"] }
+egui = "0.37"
 tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "time"] }
 tokio-util = "0.7"
 tokio-tungstenite = "0.30"
@@ -36,7 +36,7 @@ hyper-util = "0.1"
 http-body-util = "0.1"
 tower-service = "0.3"
 getrandom = "0.4"
-base64 = "0.22"
+base64 = "0.23"
 sha1_smol = "1"
 des = "0.9"
 flate2 = "1.1"
