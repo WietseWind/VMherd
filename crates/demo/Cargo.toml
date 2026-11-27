@@ -16,8 +16,8 @@ workspace = true
 # Not the workspace tokio: that one has the `net` feature.
 tokio = { version = "1.53", features = ["rt", "sync", "time", "io-util", "macros"] }
 # The versions and features epaint already uses to rasterize glyphs: nothing new is compiled.
-skrifa = { version = "0.44", default-features = false, features = ["std"] }
-vello_cpu = { version = "0.1", default-features = false, features = ["std", "u8_pipeline"] }
+skrifa = { version = "0.47", default-features = false, features = ["std"] }
+vello_cpu = { version = "0.2", default-features = false, features = ["std", "u8_pipeline"] }
 
 [dev-dependencies]
 rfb.workspace = true
